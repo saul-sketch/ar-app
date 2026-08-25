@@ -70,3 +70,21 @@ const rpc = (fn, args) => fetch(SUPA_URL + '/rest/v1/rpc/' + fn,
 function base(){ return location.origin + location.pathname.replace(/[^/]*$/, ''); }
 /* El link que se le pasa a Finance: corto y sin signos raros. */
 function linkPublico(codigo){ return base() + codigo; }
+
+/* ── Notas de Finance ────────────────────────────────────────────────────────
+   Histórico, no un campo que se pisa: cada nota queda con quién y cuándo. Igual
+   que en Pólizas, que es donde ya funciona y a Saúl le gustó. */
+function bitIniciales(n){
+  const p = String(n || '').trim().split(/\s+/).filter(Boolean);
+  return ((p[0]||'?')[0] + ((p[1]||'')[0] || '')).toUpperCase();
+}
+function bitCuando(iso){
+  if(!iso) return '';
+  const d = new Date(iso), hoy = new Date();
+  const mismoDia = d.toDateString() === hoy.toDateString();
+  const hora = d.toLocaleTimeString('es-ES',{hour:'numeric',minute:'2-digit'});
+  if (mismoDia) return 'hoy ' + hora;
+  const ayer = new Date(hoy); ayer.setDate(ayer.getDate()-1);
+  if (d.toDateString() === ayer.toDateString()) return 'ayer ' + hora;
+  return `${d.getDate()} ${MESES[d.getMonth()].slice(0,3)} · ${hora}`;
+}

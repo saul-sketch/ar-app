@@ -46,6 +46,20 @@
   .det .dato .k{color:var(--gray-500);} .det .dato .v{font-weight:600;text-align:right;}
   .det .notas{background:#fffbeb;border-left:3px solid var(--yellow);border-radius:8px;padding:11px;font-size:13px;line-height:1.5;margin-top:10px;white-space:pre-wrap;}
   .det .acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+  .bit{margin-top:14px;padding-top:12px;border-top:1px solid var(--gray-200);}
+  .bit h4{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-500);margin-bottom:9px;display:flex;align-items:center;gap:7px;}
+  .bit h4 .n{background:var(--gray-100);border-radius:999px;padding:2px 7px;font-size:10px;color:var(--gray-700);}
+  .bit-item{display:flex;gap:9px;padding:9px 0;border-bottom:1px solid var(--gray-100);}
+  .bit-item:last-of-type{border-bottom:0;}
+  .bit-ini{flex-shrink:0;width:28px;height:28px;border-radius:50%;background:var(--primary);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+  .bit-cuerpo{flex:1;min-width:0;}
+  .bit-meta{font-size:11px;color:var(--gray-400);font-weight:600;}
+  .bit-meta b{color:var(--gray-700);font-weight:700;}
+  .bit-texto{font-size:13.5px;line-height:1.5;color:var(--gray-900);margin-top:2px;white-space:pre-wrap;word-break:break-word;}
+  .bit-nueva{display:flex;gap:8px;margin-top:10px;}
+  .bit-nueva textarea{flex:1;min-height:44px;max-height:140px;padding:10px 12px;border:1.5px solid var(--gray-200);border-radius:9px;font-size:13.5px;font-family:inherit;background:var(--gray-100);resize:vertical;line-height:1.45;}
+  .bit-nueva textarea:focus{outline:none;border-color:var(--blue);background:#fff;box-shadow:0 0 0 3px rgba(59,130,246,.1);}
+  .bit-vacia{font-size:12.5px;color:var(--gray-400);padding:4px 0 2px;}
   .det .acc .btn{padding:9px 15px;font-size:12px;min-height:40px;}
 </style>
 </head>
@@ -156,6 +170,7 @@ function fila(a){
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <span class="badge b-${urg}">${esc(et('urgencia', a.urgencia))}</span>
         ${a.estado !== 'nueva' ? `<span class="badge b-azul">${esc(et('estado', a.estado))}</span>` : ''}
+        ${(a.bitacora || []).length ? `<span class="badge b-gris" title="notas de Finance">✎ ${(a.bitacora || []).length}</span>` : ''}
       </div>
     </div>
     <div class="cifras">
@@ -174,6 +189,7 @@ function fila(a){
       <div class="dato"><div class="k">Busca</div><div class="v">${esc(tipos.join(' · ') || '—')}</div></div>
       <div class="dato"><div class="k">Co-buyer</div><div class="v">${esc(et('co_buyer', a.co_buyer))}</div></div>
       ${a.notas ? `<div class="notas">${esc(a.notas)}</div>` : ''}
+      ${bitacora(a)}
       <div class="acc">
         <a class="btn btn-ghost" style="text-decoration:none;display:inline-block" href="tel:${esc(String(a.cliente_telefono).replace(/\D/g,''))}">Llamar</a>
         <button class="btn btn-ghost" onclick="copiar('${a.codigo || a.id}', this)">Copiar link</button>
@@ -183,6 +199,66 @@ function fila(a){
       </div>
     </div>
   </div>`;
+}
+
+/* Las notas son INTERNAS: se ven aquí, nunca en el link que se le pasa a Finance
+   por mensaje. Ese link no tiene clave y podría terminar donde el cliente. */
+function bitacora(a){
+  const b = Array.isArray(a.bitacora) ? a.bitacora : [];
+  const items = b.map(n => `
+    <div class="bit-item">
+      <div class="bit-ini">${esc(bitIniciales(n.quien))}</div>
+      <div class="bit-cuerpo">
+        <div class="bit-meta"><b>${esc(n.quien || 'Finance')}</b> · ${esc(bitCuando(n.cuando))}</div>
+        <div class="bit-texto">${esc(n.texto)}</div>
+      </div>
+    </div>`).join('');
+  return `<div class="bit">
+    <h4>Notas de Finance ${b.length ? `<span class="n">${b.length}</span>` : ''}</h4>
+    ${items || '<div class="bit-vacia">Todavía nadie ha escrito nada.</div>'}
+    <div class="bit-nueva">
+      <textarea id="nota-${a.id}" placeholder="Ej: crédito 400, no hay nada — pedir co-signer" onkeydown="if(event.key==='Enter'&&(event.metaKey||event.ctrlKey))agregarNota('${a.id}')"></textarea>
+      <button class="btn btn-primary" style="flex:0 0 auto;min-width:0;padding:10px 16px;font-size:13px" onclick="agregarNota('${a.id}')">Agregar</button>
+    </div>
+  </div>`;
+}
+
+async function agregarNota(id){
+  const ta = document.getElementById('nota-' + id);
+  const texto = (ta.value || '').trim();
+  if (!texto) return;
+  const quien = await quienEscribe();
+  if (!quien) return;
+  const btn = ta.parentElement.querySelector('button');
+  btn.disabled = true; btn.textContent = '…';
+  // Se pinta primero para que no se sienta lento; si falla, se deshace.
+  const a = TODAS.find(x => x.id === id);
+  const antes = Array.isArray(a.bitacora) ? a.bitacora.slice() : [];
+  a.bitacora = antes.concat([{ quien, texto, cuando: new Date().toISOString() }]);
+  ta.value = ''; pintar();
+  try{
+    const r = await rpc('ar_oa_nota', { p_codigo: CODIGO, p_id: id, p_quien: quien, p_texto: texto });
+    if (!Array.isArray(r) || !r.length) throw new Error('no se guardó');
+    a.bitacora = r[0].bitacora || a.bitacora;
+    pintar();
+  }catch(e){
+    a.bitacora = antes; pintar();
+    alert('No se pudo guardar la nota. Revisa el internet — el texto sigue abajo.');
+    const t2 = document.getElementById('nota-' + id); if (t2) t2.value = texto;
+  }
+}
+
+/* Quién escribe. Se pregunta UNA vez por teléfono y queda guardado, igual que el
+   nombre del vendedor en el formulario. Sin esto todas las notas dirían "Finance"
+   y no se sabría quién dijo qué, que es justo lo que se quiere saber. */
+const QUIEN = 'ar_oa_quien';
+async function quienEscribe(){
+  let q = ''; try{ q = localStorage.getItem(QUIEN) || ''; }catch(e){}
+  if (q) return q;
+  q = (prompt('¿Quién eres? (tu nombre queda en cada nota)') || '').trim();
+  if (!q) return null;
+  try{ localStorage.setItem(QUIEN, q); }catch(e){}
+  return q;
 }
 
 function abrir(id){ ABIERTA = ABIERTA === id ? null : id; pintar(); }
