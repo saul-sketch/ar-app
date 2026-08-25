@@ -39,6 +39,7 @@ const dato = (k, v, resalta) => `<div class="dato"><div class="k">${k}</div><div
     <div class="sect"><h2>Trade-in</h2>
       ${dato('¿Tiene?', et('trade_in', a.trade_in))}
       ${a.trade_in === 'debe' ? dato('VIN', a.trade_vin) + dato('Millas', millas(a.trade_millas)) + dato('Payoff aproximado', dinero(a.trade_payoff)) : ''}
+      ${dato('Placa', et('placa', a.placa))}
     </div>
 
     <div class="sect"><h2>Cuándo y qué</h2>

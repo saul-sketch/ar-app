@@ -35,6 +35,7 @@ const ET: Record<string, Record<string, string>> = {
   urgencia: { hoy: "Hoy", "2-3dias": "En los próximos 2–3 días", semana: "Esta semana", mes: "Este mes", sin_fecha: "No tiene fecha específica" },
   co_buyer: { solo: "Solo él/ella", ya_aplico: "Hay co-buyer y ya aplicó", no_aplico: "Hay co-buyer pero todavía no ha aplicado", podria: "Podría conseguir uno si fuera necesario" },
   tipo_carro: { sedan: "Sedan", suv: "SUV", pickup: "Pickup", tres_filas: "3 filas", economico: "Económico", abierto: "Abierto a opciones", especifico: "Vehículo específico" },
+  placa: { nueva: "Tablilla nueva", transferencia: "Transferencia de placa", no_sabe: "No sabe todavía" },
 };
 const et = (c: string, v: string) => ET[c]?.[v] ?? v ?? "";
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
@@ -90,6 +91,7 @@ function cuerpo(a: Record<string, any>, link: string) {
         ${a.down_cuando ? fila("¿Para cuándo?", a.down_cuando) : ""}
         ${fila("Trade-in", et("trade_in", a.trade_in))}
         ${a.trade_in === "debe" ? fila("VIN", a.trade_vin ?? "—") + fila("Payoff", money(a.trade_payoff)) : ""}
+        ${fila("Placa", et("placa", a.placa))}
         ${fila("Necesita comprar", et("urgencia", a.urgencia))}
         ${fila("Busca", tipos.join(" · ") || "—")}
         ${fila("Co-buyer", et("co_buyer", a.co_buyer))}

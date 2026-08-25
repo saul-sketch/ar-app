@@ -38,6 +38,7 @@ const ETIQUETAS = {
   urgencia: { hoy: 'Hoy', '2-3dias': 'En los próximos 2–3 días', semana: 'Esta semana', mes: 'Este mes', sin_fecha: 'No tiene fecha específica' },
   co_buyer: { solo: 'Solo él/ella', ya_aplico: 'Hay co-buyer y ya aplicó', no_aplico: 'Hay co-buyer pero todavía no ha aplicado', podria: 'Podría conseguir uno si fuera necesario' },
   tipo_carro: { sedan: 'Sedan', suv: 'SUV', pickup: 'Pickup', tres_filas: '3 filas', economico: 'Económico', abierto: 'Abierto a opciones', especifico: 'Vehículo específico' },
+  placa: { nueva: 'Tablilla nueva', transferencia: 'Transferencia de placa', no_sabe: 'No sabe todavía' },
   estado: { nueva: 'Nueva', trabajando: 'Trabajándola', esperando: 'Esperando al cliente', cerrada: 'Cerrada' }
 };
 const et = (campo, v) => (ETIQUETAS[campo] && ETIQUETAS[campo][v]) || v || '';

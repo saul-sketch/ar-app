@@ -139,7 +139,17 @@
       </div>
 
       <div class="q">
-        <label class="qlabel"><span class="qnum">6</span>¿Para cuándo necesita comprar el carro?<span class="req">*</span></label>
+        <label class="qlabel"><span class="qnum">6</span>¿Necesita tablilla nueva o transfiere placa?<span class="req">*</span></label>
+        <div class="qhint" style="margin-bottom:8px">Cambia los fees del título, por eso Finance lo necesita antes de armar el deal.</div>
+        <div class="opts" id="o_placa">
+          <button type="button" class="opt-btn" data-v="nueva">Tablilla nueva</button>
+          <button type="button" class="opt-btn" data-v="transferencia">Transferencia de placa</button>
+          <button type="button" class="opt-btn" data-v="no_sabe">No sabe todavía</button>
+        </div>
+      </div>
+
+      <div class="q">
+        <label class="qlabel"><span class="qnum">7</span>¿Para cuándo necesita comprar el carro?<span class="req">*</span></label>
         <div class="opts" id="o_urgencia">
           <button type="button" class="opt-btn" data-v="hoy">Hoy</button>
           <button type="button" class="opt-btn" data-v="2-3dias">En los próximos 2–3 días</button>
@@ -150,7 +160,7 @@
       </div>
 
       <div class="q">
-        <label class="qlabel"><span class="qnum">7</span>¿Cuándo puede venir al dealer?</label>
+        <label class="qlabel"><span class="qnum">8</span>¿Cuándo puede venir al dealer?</label>
         <div class="field-grid grid-2">
           <div class="field">
             <div class="field-label">Fecha</div>
@@ -164,7 +174,7 @@
       </div>
 
       <div class="q">
-        <label class="qlabel"><span class="qnum">8</span>¿Qué tipo de carro está buscando?<span class="opt">puedes marcar varios</span></label>
+        <label class="qlabel"><span class="qnum">9</span>¿Qué tipo de carro está buscando?<span class="opt">puedes marcar varios</span></label>
         <div class="opts" id="o_tipo">
           <button type="button" class="opt-btn" data-v="sedan">Sedan</button>
           <button type="button" class="opt-btn" data-v="suv">SUV</button>
@@ -185,7 +195,7 @@
       </div>
 
       <div class="q">
-        <label class="qlabel"><span class="qnum">9</span>¿Esta aplicación es solo para él/ella o hay co-buyer / co-signer?<span class="req">*</span></label>
+        <label class="qlabel"><span class="qnum">10</span>¿Esta aplicación es solo para él/ella o hay co-buyer / co-signer?<span class="req">*</span></label>
         <div class="opts" id="o_cobuyer">
           <button type="button" class="opt-btn" data-v="solo">Solo él/ella</button>
           <button type="button" class="opt-btn" data-v="ya_aplico">Hay co-buyer y ya aplicó</button>
@@ -195,7 +205,7 @@
       </div>
 
       <div class="q">
-        <label class="qlabel"><span class="qnum">10</span>¿Hay algo importante que Finance deba saber antes de trabajar el deal?</label>
+        <label class="qlabel"><span class="qnum">11</span>¿Hay algo importante que Finance deba saber antes de trabajar el deal?</label>
         <div class="qhint" style="margin-bottom:8px">Aquí sale lo más útil. Cualquier cosa: trabajo nuevo, crédito, un familiar que ayuda, algo que dijo el cliente.</div>
         <textarea class="field-input" id="f_notas" placeholder="Escribe lo que sea relevante..."></textarea>
       </div>
@@ -262,7 +272,7 @@ function grupo(id, campo, multiple){
   });
 }
 function mostrar(id, si){ document.getElementById(id).classList.toggle('show', !!si); }
-grupo('o_location','location'); grupo('o_trade','trade_in'); grupo('o_urgencia','urgencia');
+grupo('o_location','location'); grupo('o_trade','trade_in'); grupo('o_urgencia','urgencia'); grupo('o_placa','placa');
 grupo('o_cobuyer','co_buyer'); grupo('o_tipo','tipo_carro', true);
 
 // El teléfono se formatea solo mientras escribe
@@ -298,7 +308,7 @@ const num = id => { const d = val(id).replace(/[^\d]/g,''); return d ? Number(d)
 function limpiar(){
   if (!confirm('¿Borrar todo lo escrito?')) return;
   document.querySelectorAll('.field-input').forEach(i => { if (i.id !== 'f_vend_nombre' && i.id !== 'f_vend_email') i.value=''; });
-  ['trade_in','urgencia','co_buyer'].forEach(k => delete sel[k]);
+  ['trade_in','placa','urgencia','co_buyer'].forEach(k => delete sel[k]);
   tipos = [];
   document.querySelectorAll('.opt-btn').forEach(b => { if (b.closest('#o_location')) return; b.classList.remove('on','rojo','ambar'); });
   mostrar('step_trade', false); mostrar('step_vehiculo', false);
@@ -322,7 +332,7 @@ async function enviar(){
   const email = val('f_vend_email');
   if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ falta.push('tu email no se ve válido'); document.getElementById('f_vend_email').classList.add('invalid'); }
   if (val('f_cli_tel').replace(/\D/g,'').length !== 10){ falta.push('teléfono completo (10 dígitos)'); document.getElementById('f_cli_tel').classList.add('invalid'); }
-  [['trade_in','o_trade','trade-in (5)'],['urgencia','o_urgencia','para cuándo lo necesita (6)'],['co_buyer','o_cobuyer','co-buyer (9)']]
+  [['trade_in','o_trade','trade-in (5)'],['placa','o_placa','tablilla o transferencia (6)'],['urgencia','o_urgencia','para cuándo lo necesita (7)'],['co_buyer','o_cobuyer','co-buyer (10)']]
     .forEach(([k,id,lbl]) => { if(!sel[k]){ falta.push(lbl); document.getElementById(id).classList.add('invalid'); } });
   if (falta.length) return marcarFalta(falta);
 
@@ -340,6 +350,7 @@ async function enviar(){
     trade_vin: sel.trade_in === 'debe' ? (val('f_vin').toUpperCase() || null) : null,
     trade_millas: sel.trade_in === 'debe' ? (val('f_millas') || null) : null,
     trade_payoff: sel.trade_in === 'debe' ? num('f_payoff') : null,
+    placa: sel.placa,
     urgencia: sel.urgencia,
     visita_fecha: val('f_visita_fecha') || null, visita_hora: val('f_visita_hora') || null,
     tipo_carro: tipos,
@@ -423,6 +434,7 @@ function mandarmeCopia(){
     `Down hoy: ${dinero(a.down_hoy) || '—'}`,
     `Podría conseguir hasta: ${dinero(a.down_max) || '—'}`,
     `Trade-in: ${et('trade_in', a.trade_in)}`,
+    `Placa: ${et('placa', a.placa)}`,
     `Necesita comprar: ${et('urgencia', a.urgencia)}`,
     `Co-buyer: ${et('co_buyer', a.co_buyer)}`, '',
     a.notas ? `Nota: ${a.notas}` : ''

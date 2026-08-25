@@ -214,6 +214,7 @@ function fila(a){
       <div class="cif"><div class="n">${dinero(a.down_hoy) || '—'}</div><div class="l">Down hoy</div></div>
       <div class="cif"><div class="n">${dinero(a.down_max) || '—'}</div><div class="l">Hasta</div></div>
       <div class="cif"><div class="n" style="font-size:13px;font-weight:600">${esc(et('trade_in', a.trade_in))}</div><div class="l">Trade-in</div></div>
+      ${a.placa ? `<div class="cif"><div class="n" style="font-size:13px;font-weight:600">${esc(a.placa === 'transferencia' ? 'Transfiere' : a.placa === 'nueva' ? 'Nueva' : 'No sabe')}</div><div class="l">Placa</div></div>` : ''}
     </div>
     <div class="det ${abierta?'show':''}" onclick="event.stopPropagation()">
       ${a.down_cuando ? `<div class="dato"><div class="k">¿Para cuándo tendría el down?</div><div class="v">${esc(a.down_cuando)}</div></div>` : ''}
@@ -221,6 +222,7 @@ function fila(a){
         <div class="dato"><div class="k">VIN del trade</div><div class="v">${esc(a.trade_vin || '—')}</div></div>
         <div class="dato"><div class="k">Millas</div><div class="v">${esc(millas(a.trade_millas) || '—')}</div></div>
         <div class="dato"><div class="k">Payoff</div><div class="v">${esc(dinero(a.trade_payoff) || '—')}</div></div>` : ''}
+      <div class="dato"><div class="k">Placa</div><div class="v">${esc(et('placa', a.placa) || '—')}</div></div>
       <div class="dato"><div class="k">Puede venir</div><div class="v">${esc([fechaLarga(a.visita_fecha), a.visita_hora].filter(Boolean).join(' · ') || '—')}</div></div>
       <div class="dato"><div class="k">Busca</div><div class="v">${esc(tipos.join(' · ') || '—')}</div></div>
       <div class="dato"><div class="k">Co-buyer</div><div class="v">${esc(et('co_buyer', a.co_buyer))}</div></div>
