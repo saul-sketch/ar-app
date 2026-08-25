@@ -72,11 +72,24 @@ async function contactoDelVendedor(emailCrudo: string, nombre: string): Promise<
       source: "Online Application",
     }),
   }).then((r) => r.json()).catch(() => null);
-  if (c?.contact?.id) return c.contact.id;
+  const creado = c?.contact?.id;
   // Si aun asi choca por duplicado, el propio error trae el id del que ya existe.
   // Sin esto se perdia el correo por una diferencia de mayusculas.
-  if (c?.meta?.contactId) return c.meta.contactId;
-  return null;
+  if (!creado) return c?.meta?.contactId ?? null;
+
+  // El CRM tiene 81 automatizaciones publicadas, varias de nurturing. Un vendedor que
+  // entra como contacto nuevo puede acabar recibiendo publicidad de comprar carro.
+  // Se le apagan SMS, llamadas y WhatsApp de una vez. El email se deja vivo a
+  // proposito: es el canal por el que le mandamos su copia.
+  await fetch(`${GHL}/contacts/${creado}`, {
+    method: "PUT", headers: hGhl(),
+    body: JSON.stringify({ dndSettings: {
+      SMS:      { status: "active", message: "Vendedor interno — no es cliente", code: "101" },
+      Call:     { status: "active", message: "Vendedor interno — no es cliente", code: "101" },
+      WhatsApp: { status: "active", message: "Vendedor interno — no es cliente", code: "101" },
+    } }),
+  }).catch(() => {});
+  return creado;
 }
 
 function cuerpo(a: Record<string, any>, link: string) {
