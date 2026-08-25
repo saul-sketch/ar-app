@@ -385,7 +385,10 @@ async function enviarCopiaSola(codigo){
       // Le pasó a saul@auto-republic.com en la primera prueba. No se arregla
       // reintentando: hay que resuscribir ese correo en el CRM. Se dice con nombre
       // y apellido para que sepa exactamente qué pedir.
-      aviso.innerHTML = '<div class="nota warn" style="margin:0 0 16px"><span>⚠️</span><div><strong>Tu correo está dado de baja en el CRM</strong>, por eso no te llegó la copia. Pídele a Saúl que te reactive. Mientras tanto el link de abajo sí sirve.</div></div>';
+      // El arreglo que SÍ está en su mano: usar otro correo. Sacarlo de la lista de
+      // bajas del CRM no se puede por fuera, así que decirle "pide que te reactiven"
+      // lo dejaba esperando por algo que nadie le va a resolver rápido.
+      aviso.innerHTML = '<div class="nota warn" style="margin:0 0 16px"><span>⚠️</span><div>Ese correo pidió no recibir mensajes de Auto Republic alguna vez, así que no le podemos escribir. <strong>Vuelve a someter con otro correo tuyo</strong> y te llega. El link de abajo sirve igual.</div></div>';
     } else if (j.motivo === 'sin_llave'){
       aviso.innerHTML = '<div class="qhint">El envío automático todavía no está conectado — usa el botón de abajo.</div>';
     } else {
