@@ -381,9 +381,12 @@ async function enviarCopiaSola(codigo){
     if (j.ok){
       aviso.innerHTML = `<div class="nota" style="margin:0 0 16px"><span>📬</span><div>Copia enviada a <strong>${esc(j.para)}</strong>.</div></div>`;
       document.getElementById('btn-copia-manual').style.display = 'none';
+    } else if (j.motivo === 'dado_de_baja'){
+      // Le pasó a saul@auto-republic.com en la primera prueba. No se arregla
+      // reintentando: hay que resuscribir ese correo en el CRM. Se dice con nombre
+      // y apellido para que sepa exactamente qué pedir.
+      aviso.innerHTML = '<div class="nota warn" style="margin:0 0 16px"><span>⚠️</span><div><strong>Tu correo está dado de baja en el CRM</strong>, por eso no te llegó la copia. Pídele a Saúl que te reactive. Mientras tanto el link de abajo sí sirve.</div></div>';
     } else if (j.motivo === 'sin_llave'){
-      // Todavía no hay servicio de correo conectado: se lo decimos claro y le
-      // dejamos el botón de mandársela él mismo.
       aviso.innerHTML = '<div class="qhint">El envío automático todavía no está conectado — usa el botón de abajo.</div>';
     } else {
       aviso.innerHTML = '<div class="nota warn" style="margin:0 0 16px"><span>⚠️</span><div>No salió la copia por email. El link de arriba sí sirve — cópialo y mándalo.</div></div>';
