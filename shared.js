@@ -45,4 +45,16 @@ const et = (campo, v) => (ETIQUETAS[campo] && ETIQUETAS[campo][v]) || v || '';
 /* La urgencia manda: es lo que decide qué se trabaja primero. */
 const URGENCIA_COLOR = { hoy: 'rojo', '2-3dias': 'ambar', semana: 'ambar', mes: 'gris', sin_fecha: 'gris' };
 
+/* Un id propio, generado aquí. Así el formulario no necesita permiso de LECTURA
+   para saber el link: escribe y ya sabe cuál es. */
+function nuevoId(){
+  if (crypto && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = crypto.getRandomValues(new Uint8Array(1))[0] % 16;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+const rpc = (fn, args) => fetch(SUPA_URL + '/rest/v1/rpc/' + fn,
+  { method:'POST', headers: SUPA_H, body: JSON.stringify(args) }).then(r => r.json());
+
 function linkPublico(id){ return location.origin + location.pathname.replace(/[^/]*$/, '') + 'a.html?id=' + id; }

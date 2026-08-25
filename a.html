@@ -39,8 +39,7 @@ const dato = (k, v, resalta) => `<div class="dato"><div class="k">${k}</div><div
   if (!id){ out.innerHTML = '<div class="vacio">Link incompleto.</div>'; return; }
   let a;
   try{
-    const r = await fetch(`${TABLA}?id=eq.${encodeURIComponent(id)}&select=*`, {headers: SUPA_H});
-    [a] = await r.json();
+    [a] = await rpc('ar_oa_una', { p_id: id });
   }catch(e){}
   if (!a){ out.innerHTML = '<div class="vacio">No se encontró esta aplicación.<br>Puede que el link esté mal copiado.</div>'; return; }
 

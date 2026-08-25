@@ -34,7 +34,20 @@
 </style>
 </head>
 <body>
-<div class="container wide">
+<div class="container" id="puerta" style="max-width:420px">
+  <div class="header"><div><h1>Aplicaciones online</h1><div class="subtitle">Auto Republic</div></div></div>
+  <div class="body">
+    <div class="nota"><span>🔒</span><div>Aquí están los clientes con su teléfono. Pide el código al equipo.</div></div>
+    <div class="field">
+      <div class="field-label">Código</div>
+      <input class="field-input" id="codigo" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')entrar()" style="letter-spacing:2px">
+    </div>
+    <div id="puerta-error"></div>
+    <div class="acciones"><button class="btn btn-primary" onclick="entrar()" id="btn-entrar">Entrar</button></div>
+  </div>
+</div>
+
+<div class="container wide" id="panel" style="display:none">
   <div class="header">
     <div>
       <h1>Aplicaciones online</h1>
@@ -56,12 +69,30 @@
 </div>
 <script src="shared.js"></script>
 <script>
-let TODAS = [], FILTRO = 'todas', BUSCA = '', ABIERTA = null;
+let TODAS = [], FILTRO = 'todas', BUSCA = '', ABIERTA = null, CODIGO = '';
+const GUARDA = 'ar_oa_codigo';
 
+async function entrar(){
+  const c = (document.getElementById('codigo').value || '').trim();
+  const btn = document.getElementById('btn-entrar');
+  if (!c) return;
+  btn.disabled = true; btn.textContent = 'Entrando…';
+  const n = await rpc('ar_oa_conteo', { p_codigo: c }).catch(() => null);
+  btn.disabled = false; btn.textContent = 'Entrar';
+  if (typeof n !== 'number') return errorPuerta('No se pudo conectar. Revisa el internet.');
+  if (n < 0){ try{ localStorage.removeItem(GUARDA); }catch(e){} return errorPuerta('Ese código no es.'); }
+  CODIGO = c;
+  try{ localStorage.setItem(GUARDA, c); }catch(e){}
+  document.getElementById('puerta').style.display = 'none';
+  document.getElementById('panel').style.display = '';
+  await cargar();
+}
+function errorPuerta(msg){
+  document.getElementById('puerta-error').innerHTML = `<div class="nota warn"><span>⚠️</span><div>${esc(msg)}</div></div>`;
+}
 async function cargar(){
-  const r = await fetch(`${TABLA}?select=*&order=created_at.desc&limit=1000`, {headers: SUPA_H});
-  TODAS = await r.json();
-  pintar();
+  const filas = await rpc('ar_oa_todas', { p_codigo: CODIGO }).catch(() => null);
+  if (Array.isArray(filas)) { TODAS = filas; pintar(); }
 }
 
 function visibles(){
@@ -148,8 +179,7 @@ async function marcar(id, estado){
   const a = TODAS.find(x => x.id === id); if (!a) return;
   const antes = a.estado; a.estado = estado; pintar();
   try{
-    const r = await fetch(`${TABLA}?id=eq.${id}`, {method:'PATCH', headers:{...SUPA_H, Prefer:'return=representation'}, body: JSON.stringify({estado})});
-    const rows = await r.json();
+    const rows = await rpc('ar_oa_estado', { p_codigo: CODIGO, p_id: id, p_estado: estado });
     if (!Array.isArray(rows) || !rows.length) throw new Error('no se guardó');
   }catch(e){ a.estado = antes; pintar(); alert('No se pudo guardar el cambio. Revisa el internet.'); }
 }
@@ -158,7 +188,10 @@ document.querySelectorAll('.chip').forEach(c => c.onclick = () => {
   document.querySelectorAll('.chip').forEach(x => x.classList.remove('on'));
   c.classList.add('on'); FILTRO = c.dataset.f; pintar();
 });
-cargar();
+(function(){
+  let g = ''; try{ g = localStorage.getItem(GUARDA) || ''; }catch(e){}
+  if (g){ document.getElementById('codigo').value = g; entrar(); }
+})();
 </script>
 </body>
 </html>

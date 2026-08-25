@@ -307,7 +307,9 @@ async function enviar(){
 
   const btn = document.getElementById('btn-enviar');
   btn.disabled = true; btn.textContent = 'Enviando…';
+  const id = nuevoId();
   const fila = {
+    id,
     vendedor_nombre: val('f_vend_nombre'), vendedor_email: email, location: sel.location || null,
     cliente_nombre: val('f_cli_nombre'), cliente_telefono: val('f_cli_tel'),
     pago_mensual: num('f_mensual'), down_hoy: num('f_down_hoy'), down_max: num('f_down_max'),
@@ -323,15 +325,14 @@ async function enviar(){
     co_buyer: sel.co_buyer, notas: val('f_notas') || null
   };
   try{
-    const r = await fetch(TABLA, { method:'POST', headers:{...SUPA_H, Prefer:'return=representation'}, body: JSON.stringify([fila]) });
+    const r = await fetch(TABLA, { method:'POST', headers:{...SUPA_H, Prefer:'return=minimal'}, body: JSON.stringify([fila]) });
     if (!r.ok) throw new Error(await r.text());
-    const [guardada] = await r.json();
     localStorage.setItem(RECUERDA, JSON.stringify({nombre: fila.vendedor_nombre, email: fila.vendedor_email, location: fila.location}));
-    window._ultima = guardada;
+    window._ultima = fila;
     document.getElementById('pantalla-form').style.display = 'none';
     document.getElementById('pantalla-listo').style.display = '';
-    document.getElementById('listo-sub').textContent = `${guardada.cliente_nombre} · ${tel(guardada.cliente_telefono)}`;
-    document.getElementById('link-out').value = linkPublico(guardada.id);
+    document.getElementById('listo-sub').textContent = `${fila.cliente_nombre} · ${tel(fila.cliente_telefono)}`;
+    document.getElementById('link-out').value = linkPublico(id);
     window.scrollTo({top:0, behavior:'smooth'});
   }catch(e){
     btn.disabled = false; btn.textContent = 'Someter aplicación';
