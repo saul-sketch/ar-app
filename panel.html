@@ -160,8 +160,8 @@ function fila(a){
       ${a.notas ? `<div class="notas">${esc(a.notas)}</div>` : ''}
       <div class="acc">
         <a class="btn btn-ghost" style="text-decoration:none;display:inline-block" href="tel:${esc(String(a.cliente_telefono).replace(/\D/g,''))}">Llamar</a>
-        <button class="btn btn-ghost" onclick="copiar('${a.id}', this)">Copiar link</button>
-        <a class="btn btn-ghost" style="text-decoration:none;display:inline-block" href="a.html?id=${a.id}" target="_blank">Abrir link</a>
+        <button class="btn btn-ghost" onclick="copiar('${a.codigo || a.id}', this)">Copiar link</button>
+        <a class="btn btn-ghost" style="text-decoration:none;display:inline-block" href="${a.codigo ? a.codigo : 'a.html?id=' + a.id}" target="_blank">Abrir link</a>
         ${['nueva','trabajando','esperando','cerrada'].filter(e => e !== a.estado)
           .map(e => `<button class="btn btn-ghost" onclick="marcar('${a.id}','${e}')">${esc(et('estado', e))}</button>`).join('')}
       </div>

@@ -45,6 +45,15 @@ const et = (campo, v) => (ETIQUETAS[campo] && ETIQUETAS[campo][v]) || v || '';
 /* La urgencia manda: es lo que decide qué se trabaja primero. */
 const URGENCIA_COLOR = { hoy: 'rojo', '2-3dias': 'ambar', semana: 'ambar', mes: 'gris', sin_fecha: 'gris' };
 
+/* Código corto del link. Alfabeto sin 0/O/1/I/L: si alguien lo dicta por teléfono
+   o lo copia a mano, no hay forma de confundir un cero con una O. */
+const ALFABETO = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+function nuevoCodigo(n){
+  n = n || 6;
+  const b = crypto.getRandomValues(new Uint8Array(n));
+  return Array.from(b, x => ALFABETO[x % ALFABETO.length]).join('');
+}
+
 /* Un id propio, generado aquí. Así el formulario no necesita permiso de LECTURA
    para saber el link: escribe y ya sabe cuál es. */
 function nuevoId(){
@@ -57,4 +66,7 @@ function nuevoId(){
 const rpc = (fn, args) => fetch(SUPA_URL + '/rest/v1/rpc/' + fn,
   { method:'POST', headers: SUPA_H, body: JSON.stringify(args) }).then(r => r.json());
 
-function linkPublico(id){ return location.origin + location.pathname.replace(/[^/]*$/, '') + 'a.html?id=' + id; }
+/* Base del sitio: .../ar-app/  — sirve igual desde index.html, panel.html o la raíz. */
+function base(){ return location.origin + location.pathname.replace(/[^/]*$/, ''); }
+/* El link que se le pasa a Finance: corto y sin signos raros. */
+function linkPublico(codigo){ return base() + codigo; }
