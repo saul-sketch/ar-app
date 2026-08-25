@@ -87,6 +87,12 @@
   </div>
   <div class="body">
     <div class="kpis" id="kpis"></div>
+    <div class="filtros" style="margin-bottom:8px">
+      <button class="chip on" data-loc="todas">Ambas tiendas</button>
+      <button class="chip" data-loc="Orlando">Orlando</button>
+      <button class="chip" data-loc="Kissimmee">Kissimmee</button>
+      <button class="chip" data-loc="sin" id="chip-sin-tienda" style="display:none">Sin tienda</button>
+    </div>
     <div class="filtros">
       <input class="field-input" id="buscar" placeholder="Buscar por cliente, teléfono o vendedor...">
       <button class="chip on" data-f="todas">Todas</button>
@@ -100,7 +106,7 @@
 </div>
 <script src="shared.js"></script>
 <script>
-let TODAS = [], FILTRO = 'todas', BUSCA = '', ABIERTA = null, CODIGO = '';
+let TODAS = [], FILTRO = 'todas', LOC = 'todas', BUSCA = '', ABIERTA = null, CODIGO = '';
 /* Si la copia al vendedor no salió, tiene que verse aquí. Un correo que falla no
    puede quedarse solo en la pantalla del vendedor, que quizá ni lo leyó. */
 const COPIA_MAL = {
@@ -134,9 +140,17 @@ async function cargar(){
   if (Array.isArray(filas)) { TODAS = filas; pintar(); }
 }
 
+/* La tienda es un filtro aparte de los de estado: elegir Orlando no debe borrar
+   "compran ya". Y se aplica ANTES de los números de arriba, para que esos KPIs sean
+   los de la tienda que estás mirando y no los de las dos juntas. */
+function deLaTienda(){
+  if (LOC === 'todas') return TODAS;
+  if (LOC === 'sin') return TODAS.filter(a => !a.location);
+  return TODAS.filter(a => a.location === LOC);
+}
 function visibles(){
   const q = BUSCA.toLowerCase().trim();
-  return TODAS.filter(a => {
+  return deLaTienda().filter(a => {
     if (FILTRO === 'hoy' && !(a.urgencia === 'hoy' || a.urgencia === '2-3dias')) return false;
     if (FILTRO === 'nueva' && a.estado !== 'nueva') return false;
     if (FILTRO === 'trabajando' && a.estado !== 'trabajando') return false;
@@ -149,20 +163,26 @@ function visibles(){
 
 function pintar(){
   const v = visibles();
+  const base = deLaTienda();
   const hoyISO = new Date().toLocaleDateString('en-CA');
-  const deHoy = TODAS.filter(a => String(a.created_at).slice(0,10) === hoyISO).length;
-  const urgentes = TODAS.filter(a => a.urgencia === 'hoy' || a.urgencia === '2-3dias').length;
-  const sinTocar = TODAS.filter(a => a.estado === 'nueva').length;
+  const deHoy = base.filter(a => String(a.created_at).slice(0,10) === hoyISO).length;
+  const urgentes = base.filter(a => a.urgencia === 'hoy' || a.urgencia === '2-3dias').length;
+  const sinTocar = base.filter(a => a.estado === 'nueva').length;
+  // El botón "Sin tienda" solo aparece si de verdad hay alguna sin tienda.
+  const sinTienda = TODAS.filter(a => !a.location).length;
+  const cs = document.getElementById('chip-sin-tienda');
+  if (cs) cs.style.display = sinTienda ? '' : 'none';
   document.getElementById('kpis').innerHTML =
-    `<div class="kpi"><div class="n">${TODAS.length}</div><div class="l">En total</div></div>
+    `<div class="kpi"><div class="n">${base.length}</div><div class="l">${LOC === 'todas' ? 'En total' : (LOC === 'sin' ? 'Sin tienda' : esc(LOC))}</div></div>
      <div class="kpi"><div class="n">${deHoy}</div><div class="l">Entraron hoy</div></div>
      <div class="kpi"><div class="n" style="color:var(--red)">${urgentes}</div><div class="l">Compran ya</div></div>
      <div class="kpi"><div class="n" style="color:${sinTocar?'var(--yellow)':'inherit'}">${sinTocar}</div><div class="l">Sin tocar</div></div>`;
   document.getElementById('sub').textContent =
-    TODAS.length ? `${v.length} de ${TODAS.length} · la última ${cuandoRelativo(TODAS[0].created_at)}` : 'Todavía no hay ninguna';
+    TODAS.length ? `${v.length} de ${base.length}${LOC !== 'todas' ? ' en ' + (LOC === 'sin' ? 'sin tienda' : LOC) : ''} · la última ${cuandoRelativo(TODAS[0].created_at)}`
+                 : 'Todavía no hay ninguna';
 
   document.getElementById('lista').innerHTML = v.length ? v.map(fila).join('')
-    : `<div class="vacio">${TODAS.length ? 'Nada con ese filtro.' : 'Todavía no hay aplicaciones.<br>Cuando un vendedor mande la primera, aparece aquí sola.'}</div>`;
+    : `<div class="vacio">${TODAS.length ? (LOC === 'todas' ? 'Nada con ese filtro.' : 'Nada con ese filtro en ' + esc(LOC === 'sin' ? 'aplicaciones sin tienda' : LOC) + '.') : 'Todavía no hay aplicaciones.<br>Cuando un vendedor mande la primera, aparece aquí sola.'}</div>`;
 }
 
 function fila(a){
@@ -290,9 +310,13 @@ async function marcar(id, estado){
   }catch(e){ a.estado = antes; pintar(); alert('No se pudo guardar el cambio. Revisa el internet.'); }
 }
 document.getElementById('buscar').addEventListener('input', e => { BUSCA = e.target.value; pintar(); });
-document.querySelectorAll('.chip').forEach(c => c.onclick = () => {
-  document.querySelectorAll('.chip').forEach(x => x.classList.remove('on'));
+document.querySelectorAll('.chip[data-f]').forEach(c => c.onclick = () => {
+  document.querySelectorAll('.chip[data-f]').forEach(x => x.classList.remove('on'));
   c.classList.add('on'); FILTRO = c.dataset.f; pintar();
+});
+document.querySelectorAll('.chip[data-loc]').forEach(c => c.onclick = () => {
+  document.querySelectorAll('.chip[data-loc]').forEach(x => x.classList.remove('on'));
+  c.classList.add('on'); LOC = c.dataset.loc; ABIERTA = null; pintar();
 });
 (function(){
   let g = ''; try{ g = localStorage.getItem(GUARDA) || ''; }catch(e){}
