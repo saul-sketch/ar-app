@@ -24,7 +24,7 @@ const dato = (k, v, resalta) => `<div class="dato"><div class="k">${k}</div><div
 
   out.innerHTML = `
     <div class="cab">
-      <div class="nombre">${esc(a.cliente_nombre)}</div>
+      <div class="nombre">${esc(a.cliente_nombre)}${a.deal_number ? ` <span style="font-size:14px;font-weight:700;color:#3b82f6;background:#dbeafe;border-radius:6px;padding:2px 8px;margin-left:6px;vertical-align:middle">Deal #${esc(a.deal_number)}</span>` : ''}</div>
       <a class="tel" href="tel:${esc(String(a.cliente_telefono).replace(/\D/g,''))}">${esc(tel(a.cliente_telefono))}</a>
       <div class="meta">Lo llenó <strong>${esc(a.vendedor_nombre)}</strong>${a.location ? ' · ' + esc(a.location) : ''} · ${esc(cuandoRelativo(a.created_at))}</div>
     </div>

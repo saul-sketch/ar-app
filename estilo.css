@@ -38,6 +38,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .field-grid{display:grid;gap:12px;}
 .grid-2{grid-template-columns:1fr;}
 @media(min-width:600px){.grid-2{grid-template-columns:1fr 1fr;}}
+/* Nombre, Deal # y teléfono en una línea. El nombre manda, el Deal # es corto. */
+.grid-cliente{grid-template-columns:1fr;}
+@media(min-width:620px){.grid-cliente{grid-template-columns:1.5fr .8fr 1.1fr;}}
 .field{display:flex;flex-direction:column;gap:5px;}
 .field-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-500);}
 .field-input,.field-select,textarea.field-input{padding:11px 12px;border:1.5px solid var(--gray-200);border-radius:9px;font-size:15px;font-family:inherit;transition:all .15s;background:var(--gray-100);width:100%;min-height:44px;color:var(--gray-900);}

@@ -65,10 +65,14 @@
     <!-- ===== Cliente ===== -->
     <div class="sect">
       <h2>Cliente que aplicó</h2>
-      <div class="field-grid grid-2">
+      <div class="field-grid grid-cliente">
         <div class="field">
           <div class="field-label">Nombre del cliente<span class="req">*</span></div>
           <input class="field-input" id="f_cli_nombre" placeholder="Nombre y apellido">
+        </div>
+        <div class="field">
+          <div class="field-label">Deal #<span class="opt">si ya lo tiene</span></div>
+          <input class="field-input" id="f_deal" inputmode="numeric" placeholder="Ej: 48219">
         </div>
         <div class="field">
           <div class="field-label">Teléfono<span class="req">*</span></div>
@@ -329,6 +333,7 @@ async function enviar(){
     id, codigo: nuevoCodigo(),
     vendedor_nombre: val('f_vend_nombre'), vendedor_email: email, location: sel.location || null,
     cliente_nombre: val('f_cli_nombre'), cliente_telefono: val('f_cli_tel'),
+    deal_number: val('f_deal') || null,
     pago_mensual: num('f_mensual'), down_hoy: num('f_down_hoy'), down_max: num('f_down_max'),
     down_cuando: val('f_down_cuando') || null,
     trade_in: sel.trade_in,
@@ -356,7 +361,8 @@ async function enviar(){
     window._ultima = fila;
     document.getElementById('pantalla-form').style.display = 'none';
     document.getElementById('pantalla-listo').style.display = '';
-    document.getElementById('listo-sub').textContent = `${fila.cliente_nombre} · ${tel(fila.cliente_telefono)}`;
+    document.getElementById('listo-sub').textContent =
+      `${fila.cliente_nombre} · ${tel(fila.cliente_telefono)}` + (fila.deal_number ? ` · Deal #${fila.deal_number}` : '');
     document.getElementById('link-out').value = linkPublico(fila.codigo);
     window.scrollTo({top:0, behavior:'smooth'});
     // La copia sale sola. A propósito NO se espera a que termine: la aplicación ya
@@ -410,7 +416,7 @@ function abrirLink(){ window.open(document.getElementById('link-out').value, '_b
 function mandarmeCopia(){
   const a = window._ultima || {};
   const cuerpo = [
-    `Cliente: ${a.cliente_nombre}  ·  ${tel(a.cliente_telefono)}`,
+    `Cliente: ${a.cliente_nombre}  ·  ${tel(a.cliente_telefono)}` + (a.deal_number ? `  ·  Deal #${a.deal_number}` : ''),
     `Link con todas las respuestas:`,
     document.getElementById('link-out').value, '',
     `Pago mensual: ${dinero(a.pago_mensual) || '—'}`,

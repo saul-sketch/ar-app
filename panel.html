@@ -46,6 +46,11 @@
   .det .dato .k{color:var(--gray-500);} .det .dato .v{font-weight:600;text-align:right;}
   .det .notas{background:#fffbeb;border-left:3px solid var(--yellow);border-radius:8px;padding:11px;font-size:13px;line-height:1.5;margin-top:10px;white-space:pre-wrap;}
   .det .acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+  .fila .deal{font-size:12px;font-weight:700;color:var(--blue);background:#dbeafe;border-radius:6px;padding:2px 7px;margin-left:6px;vertical-align:middle;}
+  .dealbox{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--gray-200);flex-wrap:wrap;}
+  .dealbox .k{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-500);}
+  .dealbox .field-input{flex:1;min-width:120px;max-width:200px;padding:9px 11px;font-size:13.5px;min-height:40px;}
+  .dealbox .btn{padding:9px 15px;font-size:12px;min-height:40px;}
   .bit{margin-top:14px;padding-top:12px;border-top:1px solid var(--gray-200);}
   .bit h4{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-500);margin-bottom:9px;display:flex;align-items:center;gap:7px;}
   .bit h4 .n{background:var(--gray-100);border-radius:999px;padding:2px 7px;font-size:10px;color:var(--gray-700);}
@@ -94,7 +99,7 @@
       <button class="chip" data-loc="sin" id="chip-sin-tienda" style="display:none">Sin tienda</button>
     </div>
     <div class="filtros">
-      <input class="field-input" id="buscar" placeholder="Buscar por cliente, teléfono o vendedor...">
+      <input class="field-input" id="buscar" placeholder="Buscar por cliente, teléfono, Deal # o vendedor...">
       <button class="chip on" data-f="todas">Todas</button>
       <button class="chip" data-f="hoy">Compran ya</button>
       <button class="chip" data-f="nueva">Sin tocar</button>
@@ -156,7 +161,7 @@ function visibles(){
     if (FILTRO === 'trabajando' && a.estado !== 'trabajando') return false;
     if (FILTRO === 'sincopia' && !(a.copia_estado && a.copia_estado !== 'enviada')) return false;
     if (!q) return true;
-    return [a.cliente_nombre, a.cliente_telefono, a.vendedor_nombre, a.vehiculo_especifico, a.notas]
+    return [a.cliente_nombre, a.cliente_telefono, a.vendedor_nombre, a.vehiculo_especifico, a.notas, a.deal_number]
       .some(x => String(x || '').toLowerCase().includes(q));
   });
 }
@@ -194,7 +199,7 @@ function fila(a){
   <div class="fila" onclick="abrir('${a.id}')">
     <div class="top">
       <div>
-        <div class="nom">${esc(a.cliente_nombre)}</div>
+        <div class="nom">${esc(a.cliente_nombre)}${a.deal_number ? ` <span class="deal">#${esc(a.deal_number)}</span>` : ''}</div>
         <div class="linea">${esc(tel(a.cliente_telefono))} · ${esc(a.vendedor_nombre)}${a.location ? ' · ' + esc(a.location) : ''} · ${esc(cuandoRelativo(a.created_at))}</div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -224,6 +229,12 @@ function fila(a){
         ? `<div class="notas" style="background:#fffbeb;border-left-color:var(--yellow)"><b>La copia no le llegó a ${esc(a.vendedor_nombre)}</b> (${esc(a.vendedor_email)}) — ${esc(COPIA_MAL[a.copia_estado] || a.copia_estado)}. El link de arriba sí sirve para pasárselo.</div>`
         : ''}
       ${bitacora(a)}
+      <div class="dealbox">
+        <span class="k">Deal #</span>
+        <input class="field-input" id="deal-${a.id}" value="${esc(a.deal_number || '')}" inputmode="numeric"
+               placeholder="ponlo cuando lo tengas" onkeydown="if(event.key==='Enter')guardarDeal('${a.id}')">
+        <button class="btn btn-ghost" onclick="guardarDeal('${a.id}')">Guardar</button>
+      </div>
       <div class="acc">
         <a class="btn btn-ghost" style="text-decoration:none;display:inline-block" href="tel:${esc(String(a.cliente_telefono).replace(/\D/g,''))}">Llamar</a>
         <button class="btn btn-ghost" onclick="copiar('${a.codigo || a.id}', this)">Copiar link</button>
@@ -293,6 +304,27 @@ async function quienEscribe(){
   if (!q) return null;
   try{ localStorage.setItem(QUIEN, q); }catch(e){}
   return q;
+}
+
+/* Muchas veces el Deal # todavía no existe cuando el vendedor llena el formulario.
+   Que Finance lo pueda poner después es lo que hace que la aplicación se pueda
+   cruzar con DealerCenter. */
+async function guardarDeal(id){
+  const inp = document.getElementById('deal-' + id);
+  const v = (inp.value || '').trim();
+  const a = TODAS.find(x => x.id === id);
+  const antes = a.deal_number || '';
+  if (v === antes) return;
+  const btn = inp.parentElement.querySelector('button');
+  btn.disabled = true; btn.textContent = '…';
+  a.deal_number = v || null; pintar();
+  try{
+    const r = await rpc('ar_oa_deal', { p_codigo: CODIGO, p_id: id, p_deal: v });
+    if (!Array.isArray(r) || !r.length) throw new Error('no se guardó');
+  }catch(e){
+    a.deal_number = antes || null; pintar();
+    alert('No se pudo guardar el Deal #. Revisa el internet.');
+  }
 }
 
 function abrir(id){ ABIERTA = ABIERTA === id ? null : id; pintar(); }

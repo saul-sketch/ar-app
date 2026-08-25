@@ -80,7 +80,7 @@ function cuerpo(a: Record<string, any>, link: string) {
     </div>
     <div style="border:1px solid #e5e7eb;border-top:0;border-radius:0 0 14px 14px;padding:20px">
       <div style="background:#f3f4f6;border-radius:10px;padding:14px;margin-bottom:16px">
-        <div style="font-size:19px;font-weight:700">${esc(a.cliente_nombre)}</div>
+        <div style="font-size:19px;font-weight:700">${esc(a.cliente_nombre)}${a.deal_number ? ` <span style="font-size:14px;color:#3b82f6;background:#dbeafe;border-radius:6px;padding:2px 8px">Deal #${esc(a.deal_number)}</span>` : ""}</div>
         <div style="font-size:16px;color:#3b82f6;font-weight:600;margin-top:2px">${esc(fono(a.cliente_telefono))}</div>
       </div>
       <table style="width:100%;border-collapse:collapse">
@@ -142,7 +142,7 @@ Deno.serve(async (req) => {
 
     const link = SITIO.replace(/\/?$/, "/") + a.codigo;
     const html = cuerpo(a, link);
-    const asunto = `Online Application — ${a.cliente_nombre}`;
+    const asunto = `Online Application — ${a.cliente_nombre}` + (a.deal_number ? ` (Deal #${a.deal_number})` : "");
     const res = await mandar(contactId, a.vendedor_email, asunto, html);
     if (!res.ok) { await anotar(a.id, res.motivo!, res.detalle ?? ""); return json({ ...res, para: a.vendedor_email }, 200); }
     await anotar(a.id, "enviada", a.vendedor_email);
