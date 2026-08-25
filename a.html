@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Online Application — Auto Republic</title>
+<link rel="stylesheet" href="estilo.css">
+<style>
+  .dato{display:flex;justify-content:space-between;gap:14px;padding:11px 0;border-bottom:1px solid var(--gray-200);align-items:baseline;}
+  .dato:last-child{border-bottom:0;}
+  .dato .k{font-size:13px;color:var(--gray-500);flex:1;line-height:1.4;}
+  .dato .v{font-size:15px;font-weight:700;text-align:right;color:var(--gray-900);}
+  .dato .v.muted{font-weight:500;color:var(--gray-400);}
+  .cab{background:var(--gray-100);border-radius:12px;padding:16px;margin-bottom:18px;}
+  .cab .nombre{font-size:20px;font-weight:700;letter-spacing:-.3px;}
+  .cab .tel{font-size:16px;color:var(--blue);font-weight:600;margin-top:3px;text-decoration:none;display:inline-block;}
+  .cab .meta{font-size:12px;color:var(--gray-500);margin-top:8px;}
+  .notas{background:#fffbeb;border-left:3px solid var(--yellow);border-radius:8px;padding:14px;font-size:14px;line-height:1.55;color:var(--gray-900);white-space:pre-wrap;}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div>
+      <h1>Online Application</h1>
+      <div class="subtitle">Finance Handoff · Auto Republic</div>
+    </div>
+  </div>
+  <div class="body" id="out"><div class="cargando">Cargando…</div></div>
+</div>
+<script src="shared.js"></script>
+<script>
+const dato = (k, v, resalta) => `<div class="dato"><div class="k">${k}</div><div class="v ${v?'':'muted'}" ${resalta?'style="color:'+resalta+'"':''}>${v ? esc(v) : '— sin dato'}</div></div>`;
+
+(async () => {
+  const id = new URLSearchParams(location.search).get('id');
+  const out = document.getElementById('out');
+  if (!id){ out.innerHTML = '<div class="vacio">Link incompleto.</div>'; return; }
+  let a;
+  try{
+    const r = await fetch(`${TABLA}?id=eq.${encodeURIComponent(id)}&select=*`, {headers: SUPA_H});
+    [a] = await r.json();
+  }catch(e){}
+  if (!a){ out.innerHTML = '<div class="vacio">No se encontró esta aplicación.<br>Puede que el link esté mal copiado.</div>'; return; }
+
+  const urg = URGENCIA_COLOR[a.urgencia] || 'gris';
+  const colorUrg = urg === 'rojo' ? 'var(--red)' : urg === 'ambar' ? '#b45309' : '';
+  const tipos = (a.tipo_carro || []).filter(t => t !== 'especifico').map(t => et('tipo_carro', t));
+  if (a.vehiculo_especifico) tipos.push(a.vehiculo_especifico);
+
+  out.innerHTML = `
+    <div class="cab">
+      <div class="nombre">${esc(a.cliente_nombre)}</div>
+      <a class="tel" href="tel:${esc(String(a.cliente_telefono).replace(/\D/g,''))}">${esc(tel(a.cliente_telefono))}</a>
+      <div class="meta">Lo llenó <strong>${esc(a.vendedor_nombre)}</strong>${a.location ? ' · ' + esc(a.location) : ''} · ${esc(cuandoRelativo(a.created_at))}</div>
+    </div>
+
+    <div class="sect"><h2>El dinero</h2>
+      ${dato('Quiere pagar mensual', dinero(a.pago_mensual))}
+      ${dato('Down disponible hoy', dinero(a.down_hoy))}
+      ${dato('Podría conseguir hasta', dinero(a.down_max))}
+      ${dato('¿Para cuándo lo tendría?', a.down_cuando)}
+    </div>
+
+    <div class="sect"><h2>Trade-in</h2>
+      ${dato('¿Tiene?', et('trade_in', a.trade_in))}
+      ${a.trade_in === 'debe' ? dato('VIN', a.trade_vin) + dato('Millas', millas(a.trade_millas)) + dato('Payoff aproximado', dinero(a.trade_payoff)) : ''}
+    </div>
+
+    <div class="sect"><h2>Cuándo y qué</h2>
+      ${dato('Necesita comprar', et('urgencia', a.urgencia), colorUrg)}
+      ${dato('Puede venir al dealer', [fechaLarga(a.visita_fecha), a.visita_hora].filter(Boolean).join(' · '))}
+      ${dato('Busca', tipos.join(' · '))}
+      ${dato('Co-buyer / co-signer', et('co_buyer', a.co_buyer))}
+    </div>
+
+    ${a.notas ? `<div class="sect"><h2>Lo que Finance debe saber</h2><div class="notas">${esc(a.notas)}</div></div>` : ''}
+  `;
+})();
+</script>
+</body>
+</html>

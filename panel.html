@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Aplicaciones online — Auto Republic</title>
+<link rel="stylesheet" href="estilo.css">
+<style>
+  .kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px;}
+  @media(min-width:700px){.kpis{grid-template-columns:repeat(4,1fr);}}
+  .kpi{background:var(--gray-100);border-radius:12px;padding:14px;}
+  .kpi .n{font-size:24px;font-weight:800;line-height:1;}
+  .kpi .l{font-size:11px;color:var(--gray-500);text-transform:uppercase;letter-spacing:.6px;margin-top:6px;font-weight:700;}
+  .filtros{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
+  .filtros .field-input{max-width:260px;}
+  .chip{padding:8px 14px;border-radius:999px;border:1.5px solid var(--gray-200);background:var(--gray-100);color:var(--gray-700);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;min-height:40px;}
+  .chip.on{background:var(--primary);border-color:var(--primary);color:#fff;}
+  .fila{background:#fff;border:1.5px solid var(--gray-200);border-radius:12px;padding:14px;margin-bottom:9px;cursor:pointer;transition:all .15s;}
+  .fila:hover{border-color:var(--gray-300);box-shadow:var(--shadow);}
+  .fila .top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap;}
+  .fila .nom{font-size:16px;font-weight:700;letter-spacing:-.2px;}
+  .fila .linea{font-size:12px;color:var(--gray-500);margin-top:3px;}
+  .fila .cifras{display:flex;gap:16px;margin-top:10px;flex-wrap:wrap;}
+  .fila .cif .n{font-size:15px;font-weight:700;}
+  .fila .cif .l{font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:.5px;font-weight:700;}
+  .det{margin-top:12px;padding-top:12px;border-top:1px solid var(--gray-200);display:none;}
+  .det.show{display:block;}
+  .det .dato{display:flex;justify-content:space-between;gap:12px;padding:7px 0;font-size:13px;}
+  .det .dato .k{color:var(--gray-500);} .det .dato .v{font-weight:600;text-align:right;}
+  .det .notas{background:#fffbeb;border-left:3px solid var(--yellow);border-radius:8px;padding:11px;font-size:13px;line-height:1.5;margin-top:10px;white-space:pre-wrap;}
+  .det .acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+  .det .acc .btn{padding:9px 15px;font-size:12px;min-height:40px;}
+</style>
+</head>
+<body>
+<div class="container wide">
+  <div class="header">
+    <div>
+      <h1>Aplicaciones online</h1>
+      <div class="subtitle" id="sub">Cargando…</div>
+    </div>
+    <a href="index.html">+ Nueva aplicación</a>
+  </div>
+  <div class="body">
+    <div class="kpis" id="kpis"></div>
+    <div class="filtros">
+      <input class="field-input" id="buscar" placeholder="Buscar por cliente, teléfono o vendedor...">
+      <button class="chip on" data-f="todas">Todas</button>
+      <button class="chip" data-f="hoy">Compran ya</button>
+      <button class="chip" data-f="nueva">Sin tocar</button>
+      <button class="chip" data-f="trabajando">Trabajándolas</button>
+    </div>
+    <div id="lista"><div class="cargando">Cargando…</div></div>
+  </div>
+</div>
+<script src="shared.js"></script>
+<script>
+let TODAS = [], FILTRO = 'todas', BUSCA = '', ABIERTA = null;
+
+async function cargar(){
+  const r = await fetch(`${TABLA}?select=*&order=created_at.desc&limit=1000`, {headers: SUPA_H});
+  TODAS = await r.json();
+  pintar();
+}
+
+function visibles(){
+  const q = BUSCA.toLowerCase().trim();
+  return TODAS.filter(a => {
+    if (FILTRO === 'hoy' && !(a.urgencia === 'hoy' || a.urgencia === '2-3dias')) return false;
+    if (FILTRO === 'nueva' && a.estado !== 'nueva') return false;
+    if (FILTRO === 'trabajando' && a.estado !== 'trabajando') return false;
+    if (!q) return true;
+    return [a.cliente_nombre, a.cliente_telefono, a.vendedor_nombre, a.vehiculo_especifico, a.notas]
+      .some(x => String(x || '').toLowerCase().includes(q));
+  });
+}
+
+function pintar(){
+  const v = visibles();
+  const hoyISO = new Date().toLocaleDateString('en-CA');
+  const deHoy = TODAS.filter(a => String(a.created_at).slice(0,10) === hoyISO).length;
+  const urgentes = TODAS.filter(a => a.urgencia === 'hoy' || a.urgencia === '2-3dias').length;
+  const sinTocar = TODAS.filter(a => a.estado === 'nueva').length;
+  document.getElementById('kpis').innerHTML =
+    `<div class="kpi"><div class="n">${TODAS.length}</div><div class="l">En total</div></div>
+     <div class="kpi"><div class="n">${deHoy}</div><div class="l">Entraron hoy</div></div>
+     <div class="kpi"><div class="n" style="color:var(--red)">${urgentes}</div><div class="l">Compran ya</div></div>
+     <div class="kpi"><div class="n" style="color:${sinTocar?'var(--yellow)':'inherit'}">${sinTocar}</div><div class="l">Sin tocar</div></div>`;
+  document.getElementById('sub').textContent =
+    TODAS.length ? `${v.length} de ${TODAS.length} · la última ${cuandoRelativo(TODAS[0].created_at)}` : 'Todavía no hay ninguna';
+
+  document.getElementById('lista').innerHTML = v.length ? v.map(fila).join('')
+    : `<div class="vacio">${TODAS.length ? 'Nada con ese filtro.' : 'Todavía no hay aplicaciones.<br>Cuando un vendedor mande la primera, aparece aquí sola.'}</div>`;
+}
+
+function fila(a){
+  const urg = URGENCIA_COLOR[a.urgencia] || 'gris';
+  const tipos = (a.tipo_carro || []).filter(t => t !== 'especifico').map(t => et('tipo_carro', t));
+  if (a.vehiculo_especifico) tipos.push(a.vehiculo_especifico);
+  const abierta = ABIERTA === a.id;
+  return `
+  <div class="fila" onclick="abrir('${a.id}')">
+    <div class="top">
+      <div>
+        <div class="nom">${esc(a.cliente_nombre)}</div>
+        <div class="linea">${esc(tel(a.cliente_telefono))} · ${esc(a.vendedor_nombre)}${a.location ? ' · ' + esc(a.location) : ''} · ${esc(cuandoRelativo(a.created_at))}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <span class="badge b-${urg}">${esc(et('urgencia', a.urgencia))}</span>
+        ${a.estado !== 'nueva' ? `<span class="badge b-azul">${esc(et('estado', a.estado))}</span>` : ''}
+      </div>
+    </div>
+    <div class="cifras">
+      <div class="cif"><div class="n">${dinero(a.pago_mensual) || '—'}</div><div class="l">Mensual</div></div>
+      <div class="cif"><div class="n">${dinero(a.down_hoy) || '—'}</div><div class="l">Down hoy</div></div>
+      <div class="cif"><div class="n">${dinero(a.down_max) || '—'}</div><div class="l">Hasta</div></div>
+      <div class="cif"><div class="n" style="font-size:13px;font-weight:600">${esc(et('trade_in', a.trade_in))}</div><div class="l">Trade-in</div></div>
+    </div>
+    <div class="det ${abierta?'show':''}" onclick="event.stopPropagation()">
+      ${a.down_cuando ? `<div class="dato"><div class="k">¿Para cuándo tendría el down?</div><div class="v">${esc(a.down_cuando)}</div></div>` : ''}
+      ${a.trade_in === 'debe' ? `
+        <div class="dato"><div class="k">VIN del trade</div><div class="v">${esc(a.trade_vin || '—')}</div></div>
+        <div class="dato"><div class="k">Millas</div><div class="v">${esc(millas(a.trade_millas) || '—')}</div></div>
+        <div class="dato"><div class="k">Payoff</div><div class="v">${esc(dinero(a.trade_payoff) || '—')}</div></div>` : ''}
+      <div class="dato"><div class="k">Puede venir</div><div class="v">${esc([fechaLarga(a.visita_fecha), a.visita_hora].filter(Boolean).join(' · ') || '—')}</div></div>
+      <div class="dato"><div class="k">Busca</div><div class="v">${esc(tipos.join(' · ') || '—')}</div></div>
+      <div class="dato"><div class="k">Co-buyer</div><div class="v">${esc(et('co_buyer', a.co_buyer))}</div></div>
+      ${a.notas ? `<div class="notas">${esc(a.notas)}</div>` : ''}
+      <div class="acc">
+        <a class="btn btn-ghost" style="text-decoration:none;display:inline-block" href="tel:${esc(String(a.cliente_telefono).replace(/\D/g,''))}">Llamar</a>
+        <button class="btn btn-ghost" onclick="copiar('${a.id}', this)">Copiar link</button>
+        <a class="btn btn-ghost" style="text-decoration:none;display:inline-block" href="a.html?id=${a.id}" target="_blank">Abrir link</a>
+        ${['nueva','trabajando','esperando','cerrada'].filter(e => e !== a.estado)
+          .map(e => `<button class="btn btn-ghost" onclick="marcar('${a.id}','${e}')">${esc(et('estado', e))}</button>`).join('')}
+      </div>
+    </div>
+  </div>`;
+}
+
+function abrir(id){ ABIERTA = ABIERTA === id ? null : id; pintar(); }
+function copiar(id, btn){
+  const url = linkPublico(id);
+  const ok = () => { btn.textContent = 'Copiado ✓'; setTimeout(() => btn.textContent = 'Copiar link', 1800); };
+  if (navigator.clipboard) navigator.clipboard.writeText(url).then(ok).catch(ok); else ok();
+}
+async function marcar(id, estado){
+  const a = TODAS.find(x => x.id === id); if (!a) return;
+  const antes = a.estado; a.estado = estado; pintar();
+  try{
+    const r = await fetch(`${TABLA}?id=eq.${id}`, {method:'PATCH', headers:{...SUPA_H, Prefer:'return=representation'}, body: JSON.stringify({estado})});
+    const rows = await r.json();
+    if (!Array.isArray(rows) || !rows.length) throw new Error('no se guardó');
+  }catch(e){ a.estado = antes; pintar(); alert('No se pudo guardar el cambio. Revisa el internet.'); }
+}
+document.getElementById('buscar').addEventListener('input', e => { BUSCA = e.target.value; pintar(); });
+document.querySelectorAll('.chip').forEach(c => c.onclick = () => {
+  document.querySelectorAll('.chip').forEach(x => x.classList.remove('on'));
+  c.classList.add('on'); FILTRO = c.dataset.f; pintar();
+});
+cargar();
+</script>
+</body>
+</html>

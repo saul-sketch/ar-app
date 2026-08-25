@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Auto Republic — Online Application</title>
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div>
+      <h1>Online Application</h1>
+      <div class="subtitle">Finance Handoff · Auto Republic</div>
+    </div>
+    <a href="panel.html">Ver todas &rarr;</a>
+  </div>
+
+  <div class="body" id="pantalla-form">
+    <div class="nota">
+      <span>👋</span>
+      <div>Llena esto <strong>con el cliente delante</strong>, mientras hace la aplicación online. Al terminar te da un link para pasarle a Finance.</div>
+    </div>
+
+    <!-- ===== Quién lo llena ===== -->
+    <div class="sect">
+      <h2>Tú</h2>
+      <div class="field-grid grid-2">
+        <div class="field">
+          <div class="field-label">Tu nombre<span class="req">*</span></div>
+          <input class="field-input" id="f_vend_nombre" placeholder="Nombre y apellido" autocomplete="name">
+        </div>
+        <div class="field">
+          <div class="field-label">Tu email<span class="req">*</span></div>
+          <input class="field-input" id="f_vend_email" type="email" placeholder="tu@auto-republic.com" autocomplete="email">
+        </div>
+      </div>
+      <div class="field" style="margin-top:12px">
+        <div class="field-label">Tienda</div>
+        <div class="opts" id="o_location">
+          <button type="button" class="opt-btn" data-v="Orlando">Orlando</button>
+          <button type="button" class="opt-btn" data-v="Kissimmee">Kissimmee</button>
+        </div>
+      </div>
+      <div class="qhint" style="margin-top:8px">Tu nombre y email quedan guardados en este teléfono, no los vuelves a escribir.</div>
+    </div>
+
+    <!-- ===== Cliente ===== -->
+    <div class="sect">
+      <h2>Cliente que aplicó</h2>
+      <div class="field-grid grid-2">
+        <div class="field">
+          <div class="field-label">Nombre del cliente<span class="req">*</span></div>
+          <input class="field-input" id="f_cli_nombre" placeholder="Nombre y apellido">
+        </div>
+        <div class="field">
+          <div class="field-label">Teléfono<span class="req">*</span></div>
+          <input class="field-input" id="f_cli_tel" type="tel" inputmode="numeric" placeholder="(407) 555-1234">
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Las preguntas ===== -->
+    <div class="sect">
+      <h2>Las preguntas</h2>
+
+      <div class="q">
+        <label class="qlabel"><span class="qnum">1</span>¿Más o menos cuánto quiere pagar mensual?<span class="req">*</span></label>
+        <div class="money-wrapper" style="max-width:220px">
+          <input class="field-input money" id="f_mensual" type="text" inputmode="numeric" placeholder="0">
+        </div>
+      </div>
+
+      <div class="q">
+        <label class="qlabel"><span class="qnum">2</span>Down payment disponible HOY<span class="req">*</span></label>
+        <div class="money-wrapper" style="max-width:220px">
+          <input class="field-input money" id="f_down_hoy" type="text" inputmode="numeric" placeholder="0">
+        </div>
+      </div>
+
+      <div class="q">
+        <label class="qlabel"><span class="qnum">3</span>Si necesitáramos más down para lograr la aprobación, ¿hasta cuánto podría conseguir?</label>
+        <div class="money-wrapper" style="max-width:220px">
+          <input class="field-input money" id="f_down_max" type="text" inputmode="numeric" placeholder="0">
+        </div>
+      </div>
+
+      <div class="q">
+        <label class="qlabel"><span class="qnum">4</span>Si necesita conseguir más dinero, ¿para cuándo podría tenerlo?</label>
+        <input class="field-input" id="f_down_cuando" placeholder="Ej: el viernes que cobra, en 2 semanas...">
+      </div>
+
+      <div class="q">
+        <label class="qlabel"><span class="qnum">5</span>¿Tiene trade-in?<span class="req">*</span></label>
+        <div class="opts" id="o_trade">
+          <button type="button" class="opt-btn" data-v="no">No</button>
+          <button type="button" class="opt-btn" data-v="pagado">Sí, pagado</button>
+          <button type="button" class="opt-btn" data-v="debe">Sí, todavía debe dinero</button>
+        </div>
+        <div class="step" id="step_trade">
+          <div class="sub">
+            <div class="field-grid grid-2">
+              <div class="field">
+                <div class="field-label">VIN</div>
+                <input class="field-input" id="f_vin" placeholder="17 caracteres" maxlength="17" style="text-transform:uppercase">
+              </div>
+              <div class="field">
+                <div class="field-label">Millas</div>
+                <input class="field-input" id="f_millas" inputmode="numeric" placeholder="Ej: 84,000">
+              </div>
+            </div>
+            <div class="field" style="margin-top:12px;max-width:260px">
+              <div class="field-label">Payoff aproximado / cuánto debe</div>
+              <div class="money-wrapper"><input class="field-input money" id="f_payoff" inputmode="numeric" placeholder="0"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="q">
+        <label class="qlabel"><span class="qnum">6</span>¿Para cuándo necesita comprar el carro?<span class="req">*</span></label>
+        <div class="opts" id="o_urgencia">
+          <button type="button" class="opt-btn" data-v="hoy">Hoy</button>
+          <button type="button" class="opt-btn" data-v="2-3dias">En los próximos 2–3 días</button>
+          <button type="button" class="opt-btn" data-v="semana">Esta semana</button>
+          <button type="button" class="opt-btn" data-v="mes">Este mes</button>
+          <button type="button" class="opt-btn" data-v="sin_fecha">No tiene fecha específica</button>
+        </div>
+      </div>
+
+      <div class="q">
+        <label class="qlabel"><span class="qnum">7</span>¿Cuándo puede venir al dealer?</label>
+        <div class="field-grid grid-2">
+          <div class="field">
+            <div class="field-label">Fecha</div>
+            <input class="field-input" id="f_visita_fecha" type="date">
+          </div>
+          <div class="field">
+            <div class="field-label">Hora aproximada</div>
+            <input class="field-input" id="f_visita_hora" placeholder="Ej: 5:30 pm">
+          </div>
+        </div>
+      </div>
+
+      <div class="q">
+        <label class="qlabel"><span class="qnum">8</span>¿Qué tipo de carro está buscando?<span class="opt">puedes marcar varios</span></label>
+        <div class="opts" id="o_tipo">
+          <button type="button" class="opt-btn" data-v="sedan">Sedan</button>
+          <button type="button" class="opt-btn" data-v="suv">SUV</button>
+          <button type="button" class="opt-btn" data-v="pickup">Pickup</button>
+          <button type="button" class="opt-btn" data-v="tres_filas">3 filas</button>
+          <button type="button" class="opt-btn" data-v="economico">Económico</button>
+          <button type="button" class="opt-btn" data-v="abierto">Está abierto a opciones</button>
+          <button type="button" class="opt-btn" data-v="especifico">Vehículo específico</button>
+        </div>
+        <div class="step" id="step_vehiculo">
+          <div class="sub">
+            <div class="field">
+              <div class="field-label">¿Cuál vehículo?</div>
+              <input class="field-input" id="f_vehiculo" placeholder="Ej: Toyota Camry 2021 blanco">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="q">
+        <label class="qlabel"><span class="qnum">9</span>¿Esta aplicación es solo para él/ella o hay co-buyer / co-signer?<span class="req">*</span></label>
+        <div class="opts" id="o_cobuyer">
+          <button type="button" class="opt-btn" data-v="solo">Solo él/ella</button>
+          <button type="button" class="opt-btn" data-v="ya_aplico">Hay co-buyer y ya aplicó</button>
+          <button type="button" class="opt-btn" data-v="no_aplico">Hay co-buyer pero todavía no ha aplicado</button>
+          <button type="button" class="opt-btn" data-v="podria">Podría conseguir uno si fuera necesario</button>
+        </div>
+      </div>
+
+      <div class="q">
+        <label class="qlabel"><span class="qnum">10</span>¿Hay algo importante que Finance deba saber antes de trabajar el deal?</label>
+        <div class="qhint" style="margin-bottom:8px">Aquí sale lo más útil. Cualquier cosa: trabajo nuevo, crédito, un familiar que ayuda, algo que dijo el cliente.</div>
+        <textarea class="field-input" id="f_notas" placeholder="Escribe lo que sea relevante..."></textarea>
+      </div>
+    </div>
+
+    <div id="error-box"></div>
+    <div class="acciones">
+      <button class="btn btn-primary" id="btn-enviar" onclick="enviar()">Someter aplicación</button>
+      <button class="btn btn-ghost" onclick="limpiar()">Limpiar</button>
+    </div>
+  </div>
+
+  <!-- ===== Pantalla de listo ===== -->
+  <div class="body" id="pantalla-listo" style="display:none">
+    <div style="text-align:center;padding:8px 0 20px">
+      <div style="font-size:44px;line-height:1">✅</div>
+      <h2 style="font-size:20px;font-weight:700;margin-top:10px">Aplicación enviada</h2>
+      <p style="color:var(--gray-500);font-size:14px;margin-top:6px" id="listo-sub"></p>
+    </div>
+    <div class="nota">
+      <span>🔗</span>
+      <div>Este es el link con todas las respuestas. Pásaselo a Finance por mensaje — se abre solo, sin clave.</div>
+    </div>
+    <div class="field">
+      <div class="field-label">Link de esta aplicación</div>
+      <input class="field-input" id="link-out" readonly onclick="this.select()" style="font-size:13px">
+    </div>
+    <div class="acciones">
+      <button class="btn btn-primary" onclick="copiarLink()" id="btn-copiar">Copiar link</button>
+      <button class="btn btn-ghost" onclick="abrirLink()">Abrir</button>
+      <button class="btn btn-ghost" onclick="mandarmeCopia()">Enviarme copia</button>
+      <button class="btn btn-ghost" onclick="location.reload()">Otra aplicación</button>
+    </div>
+  </div>
+</div>
+
+<script src="shared.js"></script>
+<script>
+const sel = {};          // selección simple por grupo
+let tipos = [];          // pregunta 8: varias
+
+function grupo(id, campo, multiple){
+  const cont = document.getElementById(id);
+  cont.querySelectorAll('.opt-btn').forEach(b => b.onclick = () => {
+    const v = b.dataset.v;
+    if (multiple){
+      const i = tipos.indexOf(v);
+      if (i >= 0) tipos.splice(i,1); else tipos.push(v);
+      b.classList.toggle('on', tipos.includes(v));
+      mostrar('step_vehiculo', tipos.includes('especifico'));
+    } else {
+      sel[campo] = (sel[campo] === v) ? null : v;
+      cont.querySelectorAll('.opt-btn').forEach(x => {
+        x.classList.toggle('on', sel[campo] === x.dataset.v);
+        x.classList.remove('rojo','ambar');
+        if (campo === 'urgencia' && sel[campo] === x.dataset.v){
+          const c = URGENCIA_COLOR[x.dataset.v]; if (c && c !== 'gris') x.classList.add(c);
+        }
+      });
+      if (campo === 'trade_in') mostrar('step_trade', v === 'debe' && sel[campo] === 'debe');
+    }
+    cont.classList.remove('invalid');
+  });
+}
+function mostrar(id, si){ document.getElementById(id).classList.toggle('show', !!si); }
+grupo('o_location','location'); grupo('o_trade','trade_in'); grupo('o_urgencia','urgencia');
+grupo('o_cobuyer','co_buyer'); grupo('o_tipo','tipo_carro', true);
+
+// El teléfono se formatea solo mientras escribe
+document.getElementById('f_cli_tel').addEventListener('input', e => {
+  const d = e.target.value.replace(/\D/g,'').slice(0,10);
+  e.target.value = d.length > 6 ? `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`
+                 : d.length > 3 ? `(${d.slice(0,3)}) ${d.slice(3)}`
+                 : d.length ? `(${d}` : '';
+});
+// Los montos con coma, para que no se equivoquen de cifra
+['f_mensual','f_down_hoy','f_down_max','f_payoff','f_millas'].forEach(id => {
+  document.getElementById(id).addEventListener('input', e => {
+    const d = e.target.value.replace(/[^\d]/g,'');
+    e.target.value = d ? Number(d).toLocaleString('en-US') : '';
+  });
+});
+
+// Nombre y email del vendedor: se recuerdan en este teléfono
+const RECUERDA = 'ar_oa_vendedor';
+(function(){
+  try{
+    const v = JSON.parse(localStorage.getItem(RECUERDA) || '{}');
+    if (v.nombre) document.getElementById('f_vend_nombre').value = v.nombre;
+    if (v.email)  document.getElementById('f_vend_email').value  = v.email;
+    if (v.location){ sel.location = v.location;
+      document.querySelectorAll('#o_location .opt-btn').forEach(b => b.classList.toggle('on', b.dataset.v === v.location)); }
+  }catch(e){}
+})();
+
+const val = id => document.getElementById(id).value.trim();
+const num = id => { const d = val(id).replace(/[^\d]/g,''); return d ? Number(d) : null; };
+
+function limpiar(){
+  if (!confirm('¿Borrar todo lo escrito?')) return;
+  document.querySelectorAll('.field-input').forEach(i => { if (i.id !== 'f_vend_nombre' && i.id !== 'f_vend_email') i.value=''; });
+  ['trade_in','urgencia','co_buyer'].forEach(k => delete sel[k]);
+  tipos = [];
+  document.querySelectorAll('.opt-btn').forEach(b => { if (b.closest('#o_location')) return; b.classList.remove('on','rojo','ambar'); });
+  mostrar('step_trade', false); mostrar('step_vehiculo', false);
+  document.getElementById('error-box').innerHTML = '';
+}
+
+function marcarFalta(lista){
+  document.getElementById('error-box').innerHTML =
+    `<div class="nota warn"><span>⚠️</span><div><strong>Falta:</strong> ${esc(lista.join(' · '))}</div></div>`;
+  document.getElementById('error-box').scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+async function enviar(){
+  const falta = [];
+  const req = [['f_vend_nombre','tu nombre'],['f_vend_email','tu email'],
+               ['f_cli_nombre','nombre del cliente'],['f_cli_tel','teléfono del cliente'],
+               ['f_mensual','pago mensual (1)'],['f_down_hoy','down de hoy (2)']];
+  document.querySelectorAll('.field-input').forEach(i => i.classList.remove('invalid'));
+  document.querySelectorAll('.opts').forEach(o => o.classList.remove('invalid'));
+  req.forEach(([id,lbl]) => { if(!val(id)){ falta.push(lbl); document.getElementById(id).classList.add('invalid'); } });
+  const email = val('f_vend_email');
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ falta.push('tu email no se ve válido'); document.getElementById('f_vend_email').classList.add('invalid'); }
+  if (val('f_cli_tel').replace(/\D/g,'').length !== 10){ falta.push('teléfono completo (10 dígitos)'); document.getElementById('f_cli_tel').classList.add('invalid'); }
+  [['trade_in','o_trade','trade-in (5)'],['urgencia','o_urgencia','para cuándo lo necesita (6)'],['co_buyer','o_cobuyer','co-buyer (9)']]
+    .forEach(([k,id,lbl]) => { if(!sel[k]){ falta.push(lbl); document.getElementById(id).classList.add('invalid'); } });
+  if (falta.length) return marcarFalta(falta);
+
+  const btn = document.getElementById('btn-enviar');
+  btn.disabled = true; btn.textContent = 'Enviando…';
+  const fila = {
+    vendedor_nombre: val('f_vend_nombre'), vendedor_email: email, location: sel.location || null,
+    cliente_nombre: val('f_cli_nombre'), cliente_telefono: val('f_cli_tel'),
+    pago_mensual: num('f_mensual'), down_hoy: num('f_down_hoy'), down_max: num('f_down_max'),
+    down_cuando: val('f_down_cuando') || null,
+    trade_in: sel.trade_in,
+    trade_vin: sel.trade_in === 'debe' ? (val('f_vin').toUpperCase() || null) : null,
+    trade_millas: sel.trade_in === 'debe' ? (val('f_millas') || null) : null,
+    trade_payoff: sel.trade_in === 'debe' ? num('f_payoff') : null,
+    urgencia: sel.urgencia,
+    visita_fecha: val('f_visita_fecha') || null, visita_hora: val('f_visita_hora') || null,
+    tipo_carro: tipos,
+    vehiculo_especifico: tipos.includes('especifico') ? (val('f_vehiculo') || null) : null,
+    co_buyer: sel.co_buyer, notas: val('f_notas') || null
+  };
+  try{
+    const r = await fetch(TABLA, { method:'POST', headers:{...SUPA_H, Prefer:'return=representation'}, body: JSON.stringify([fila]) });
+    if (!r.ok) throw new Error(await r.text());
+    const [guardada] = await r.json();
+    localStorage.setItem(RECUERDA, JSON.stringify({nombre: fila.vendedor_nombre, email: fila.vendedor_email, location: fila.location}));
+    window._ultima = guardada;
+    document.getElementById('pantalla-form').style.display = 'none';
+    document.getElementById('pantalla-listo').style.display = '';
+    document.getElementById('listo-sub').textContent = `${guardada.cliente_nombre} · ${tel(guardada.cliente_telefono)}`;
+    document.getElementById('link-out').value = linkPublico(guardada.id);
+    window.scrollTo({top:0, behavior:'smooth'});
+  }catch(e){
+    btn.disabled = false; btn.textContent = 'Someter aplicación';
+    document.getElementById('error-box').innerHTML =
+      `<div class="nota warn"><span>⚠️</span><div><strong>No se pudo enviar.</strong> Revisa el internet e intenta otra vez. Nada de lo que escribiste se perdió.</div></div>`;
+  }
+}
+
+function copiarLink(){
+  const i = document.getElementById('link-out');
+  i.select(); i.setSelectionRange(0, 99999);
+  const ok = () => { const b = document.getElementById('btn-copiar'); b.textContent='Copiado ✓'; setTimeout(()=>b.textContent='Copiar link', 1800); };
+  if (navigator.clipboard) navigator.clipboard.writeText(i.value).then(ok).catch(()=>{document.execCommand('copy');ok();});
+  else { document.execCommand('copy'); ok(); }
+}
+function abrirLink(){ window.open(document.getElementById('link-out').value, '_blank'); }
+function mandarmeCopia(){
+  const a = window._ultima || {};
+  const cuerpo = [
+    `Cliente: ${a.cliente_nombre}  ·  ${tel(a.cliente_telefono)}`,
+    `Link con todas las respuestas:`,
+    document.getElementById('link-out').value, '',
+    `Pago mensual: ${dinero(a.pago_mensual) || '—'}`,
+    `Down hoy: ${dinero(a.down_hoy) || '—'}`,
+    `Podría conseguir hasta: ${dinero(a.down_max) || '—'}`,
+    `Trade-in: ${et('trade_in', a.trade_in)}`,
+    `Necesita comprar: ${et('urgencia', a.urgencia)}`,
+    `Co-buyer: ${et('co_buyer', a.co_buyer)}`, '',
+    a.notas ? `Nota: ${a.notas}` : ''
+  ].join('\n');
+  location.href = `mailto:${encodeURIComponent(a.vendedor_email||'')}`
+    + `?subject=${encodeURIComponent('Online Application — ' + (a.cliente_nombre||''))}`
+    + `&body=${encodeURIComponent(cuerpo)}`;
+}
+</script>
+</body>
+</html>
