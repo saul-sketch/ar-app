@@ -64,6 +64,8 @@
   .bit-nueva{display:flex;gap:8px;margin-top:10px;}
   .bit-nueva textarea{flex:1;min-height:44px;max-height:140px;padding:10px 12px;border:1.5px solid var(--gray-200);border-radius:9px;font-size:13.5px;font-family:inherit;background:var(--gray-100);resize:vertical;line-height:1.45;}
   .bit-nueva textarea:focus{outline:none;border-color:var(--blue);background:#fff;box-shadow:0 0 0 3px rgba(59,130,246,.1);}
+  .bit-etapa{font-size:12px;color:var(--gray-500);padding:6px 0 6px 4px;border-bottom:1px solid var(--gray-100);}
+  .bit-etapa b{color:var(--gray-700);}
   .bit-vacia{font-size:12.5px;color:var(--gray-400);padding:4px 0 2px;}
   .det .acc .btn{padding:9px 15px;font-size:12px;min-height:40px;}
 </style>
@@ -72,10 +74,10 @@
 <div class="container" id="puerta" style="max-width:420px">
   <div class="header"><div><h1>Aplicaciones online</h1><div class="subtitle">Auto Republic</div></div></div>
   <div class="body">
-    <div class="nota"><span>🔒</span><div>Aquí están los clientes con su teléfono. Pide el código al equipo.</div></div>
+    <div class="nota"><span>🔒</span><div>Aquí están los clientes con su teléfono. Usa <strong>tu</strong> código — las notas que escribas quedan con tu nombre.</div></div>
     <div class="field">
-      <div class="field-label">Código</div>
-      <input class="field-input" id="codigo" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')entrar()" style="letter-spacing:2px">
+      <div class="field-label">Tu código</div>
+      <input class="field-input" id="codigo" type="password" placeholder="NOMBRE-XXXX" autocapitalize="characters" onkeydown="if(event.key==='Enter')entrar()" style="letter-spacing:1px">
     </div>
     <div id="puerta-error"></div>
     <div class="acciones"><button class="btn btn-primary" onclick="entrar()" id="btn-entrar">Entrar</button></div>
@@ -88,7 +90,10 @@
       <h1>Aplicaciones online</h1>
       <div class="subtitle" id="sub">Cargando…</div>
     </div>
-    <a href="index.html">+ Nueva aplicación</a>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span id="yo" style="font-size:12px;color:rgba(255,255,255,.75);font-weight:600"></span>
+      <a href="index.html">+ Nueva aplicación</a>
+    </div>
   </div>
   <div class="body">
     <div class="kpis" id="kpis"></div>
@@ -97,6 +102,7 @@
       <button class="chip" data-loc="Orlando">Orlando</button>
       <button class="chip" data-loc="Kissimmee">Kissimmee</button>
       <button class="chip" data-loc="sin" id="chip-sin-tienda" style="display:none">Sin tienda</button>
+      <button class="chip" onclick="salir()" style="margin-left:auto;color:var(--gray-500)">Salir</button>
     </div>
     <div class="filtros">
       <input class="field-input" id="buscar" placeholder="Buscar por cliente, teléfono, Deal # o vendedor...">
@@ -111,7 +117,7 @@
 </div>
 <script src="shared.js"></script>
 <script>
-let TODAS = [], FILTRO = 'todas', LOC = 'todas', BUSCA = '', ABIERTA = null, CODIGO = '';
+let TODAS = [], FILTRO = 'todas', LOC = 'todas', BUSCA = '', ABIERTA = null, CODIGO = '', QUIEN = '';
 /* Si la copia al vendedor no salió, tiene que verse aquí. Un correo que falla no
    puede quedarse solo en la pantalla del vendedor, que quizá ni lo leyó. */
 const COPIA_MAL = {
@@ -127,15 +133,20 @@ async function entrar(){
   const btn = document.getElementById('btn-entrar');
   if (!c) return;
   btn.disabled = true; btn.textContent = 'Entrando…';
-  const n = await rpc('ar_oa_conteo', { p_codigo: c }).catch(() => null);
+  const nombre = await rpc('ar_oa_quien', { p_codigo: c }).catch(() => undefined);
   btn.disabled = false; btn.textContent = 'Entrar';
-  if (typeof n !== 'number') return errorPuerta('No se pudo conectar. Revisa el internet.');
-  if (n < 0){ try{ localStorage.removeItem(GUARDA); }catch(e){} return errorPuerta('Ese código no es.'); }
-  CODIGO = c;
+  if (nombre === undefined) return errorPuerta('No se pudo conectar. Revisa el internet.');
+  if (!nombre){ try{ localStorage.removeItem(GUARDA); }catch(e){} return errorPuerta('Ese código no es. Pídele el tuyo a Saúl.'); }
+  CODIGO = c; QUIEN = nombre;
   try{ localStorage.setItem(GUARDA, c); }catch(e){}
+  document.getElementById('yo').textContent = nombre;
   document.getElementById('puerta').style.display = 'none';
   document.getElementById('panel').style.display = '';
   await cargar();
+}
+function salir(){
+  try{ localStorage.removeItem(GUARDA); }catch(e){}
+  location.reload();
 }
 function errorPuerta(msg){
   document.getElementById('puerta-error').innerHTML = `<div class="nota warn"><span>⚠️</span><div>${esc(msg)}</div></div>`;
@@ -205,7 +216,7 @@ function fila(a){
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <span class="badge b-${urg}">${esc(et('urgencia', a.urgencia))}</span>
         ${a.estado !== 'nueva' ? `<span class="badge b-azul">${esc(et('estado', a.estado))}</span>` : ''}
-        ${(a.bitacora || []).length ? `<span class="badge b-gris" title="notas de Finance">✎ ${(a.bitacora || []).length}</span>` : ''}
+        ${(a.bitacora || []).filter(x=>x.tipo!=='etapa').length ? `<span class="badge b-gris" title="notas de Finance">✎ ${(a.bitacora || []).filter(x=>x.tipo!=='etapa').length}</span>` : ''}
         ${a.copia_estado && a.copia_estado !== 'enviada' ? `<span class="badge b-ambar" title="${esc(COPIA_MAL[a.copia_estado] || a.copia_estado)}">✉ no le llegó</span>` : ''}
       </div>
     </div>
@@ -252,8 +263,9 @@ function fila(a){
    por mensaje. Ese link no tiene clave y podría terminar donde el cliente. */
 function bitacora(a){
   const b = Array.isArray(a.bitacora) ? a.bitacora : [];
-  const items = b.map(n => `
-    <div class="bit-item">
+  const items = b.map(n => n.tipo === 'etapa'
+    ? `<div class="bit-etapa">↳ <b>${esc(n.quien)}</b> ${esc(n.texto)} · ${esc(bitCuando(n.cuando))}</div>`
+    : `<div class="bit-item">
       <div class="bit-ini">${esc(bitIniciales(n.quien))}</div>
       <div class="bit-cuerpo">
         <div class="bit-meta"><b>${esc(n.quien || 'Finance')}</b> · ${esc(bitCuando(n.cuando))}</div>
@@ -261,7 +273,7 @@ function bitacora(a){
       </div>
     </div>`).join('');
   return `<div class="bit">
-    <h4>Notas de Finance ${b.length ? `<span class="n">${b.length}</span>` : ''}</h4>
+    <h4>Notas de Finance ${b.filter(x=>x.tipo!=='etapa').length ? `<span class="n">${b.filter(x=>x.tipo!=='etapa').length}</span>` : ''}</h4>
     ${items || '<div class="bit-vacia">Todavía nadie ha escrito nada.</div>'}
     <div class="bit-nueva">
       <textarea id="nota-${a.id}" placeholder="Ej: crédito 400, no hay nada — pedir co-signer" onkeydown="if(event.key==='Enter'&&(event.metaKey||event.ctrlKey))agregarNota('${a.id}')"></textarea>
@@ -274,8 +286,7 @@ async function agregarNota(id){
   const ta = document.getElementById('nota-' + id);
   const texto = (ta.value || '').trim();
   if (!texto) return;
-  const quien = await quienEscribe();
-  if (!quien) return;
+  const quien = QUIEN;
   const btn = ta.parentElement.querySelector('button');
   btn.disabled = true; btn.textContent = '…';
   // Se pinta primero para que no se sienta lento; si falla, se deshace.
@@ -292,40 +303,6 @@ async function agregarNota(id){
     a.bitacora = antes; pintar();
     alert('No se pudo guardar la nota. Revisa el internet — el texto sigue abajo.');
     const t2 = document.getElementById('nota-' + id); if (t2) t2.value = texto;
-  }
-}
-
-/* Quién escribe. Se pregunta UNA vez por teléfono y queda guardado, igual que el
-   nombre del vendedor en el formulario. Sin esto todas las notas dirían "Finance"
-   y no se sabría quién dijo qué, que es justo lo que se quiere saber. */
-const QUIEN = 'ar_oa_quien';
-async function quienEscribe(){
-  let q = ''; try{ q = localStorage.getItem(QUIEN) || ''; }catch(e){}
-  if (q) return q;
-  q = (prompt('¿Quién eres? (tu nombre queda en cada nota)') || '').trim();
-  if (!q) return null;
-  try{ localStorage.setItem(QUIEN, q); }catch(e){}
-  return q;
-}
-
-/* Muchas veces el Deal # todavía no existe cuando el vendedor llena el formulario.
-   Que Finance lo pueda poner después es lo que hace que la aplicación se pueda
-   cruzar con DealerCenter. */
-async function guardarDeal(id){
-  const inp = document.getElementById('deal-' + id);
-  const v = (inp.value || '').trim();
-  const a = TODAS.find(x => x.id === id);
-  const antes = a.deal_number || '';
-  if (v === antes) return;
-  const btn = inp.parentElement.querySelector('button');
-  btn.disabled = true; btn.textContent = '…';
-  a.deal_number = v || null; pintar();
-  try{
-    const r = await rpc('ar_oa_deal', { p_codigo: CODIGO, p_id: id, p_deal: v });
-    if (!Array.isArray(r) || !r.length) throw new Error('no se guardó');
-  }catch(e){
-    a.deal_number = antes || null; pintar();
-    alert('No se pudo guardar el Deal #. Revisa el internet.');
   }
 }
 
