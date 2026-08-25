@@ -93,6 +93,7 @@
       <button class="chip" data-f="hoy">Compran ya</button>
       <button class="chip" data-f="nueva">Sin tocar</button>
       <button class="chip" data-f="trabajando">Trabajándolas</button>
+      <button class="chip" data-f="sincopia">Sin copia ✉</button>
     </div>
     <div id="lista"><div class="cargando">Cargando…</div></div>
   </div>
@@ -100,6 +101,14 @@
 <script src="shared.js"></script>
 <script>
 let TODAS = [], FILTRO = 'todas', BUSCA = '', ABIERTA = null, CODIGO = '';
+/* Si la copia al vendedor no salió, tiene que verse aquí. Un correo que falla no
+   puede quedarse solo en la pantalla del vendedor, que quizá ni lo leyó. */
+const COPIA_MAL = {
+  dado_de_baja: 'su correo está dado de baja en el CRM',
+  correo_rechazado: 'el correo fue rechazado',
+  sin_contacto: 'no se pudo crear su contacto',
+  error: 'falló el envío'
+};
 const GUARDA = 'ar_oa_codigo';
 
 async function entrar(){
@@ -131,6 +140,7 @@ function visibles(){
     if (FILTRO === 'hoy' && !(a.urgencia === 'hoy' || a.urgencia === '2-3dias')) return false;
     if (FILTRO === 'nueva' && a.estado !== 'nueva') return false;
     if (FILTRO === 'trabajando' && a.estado !== 'trabajando') return false;
+    if (FILTRO === 'sincopia' && !(a.copia_estado && a.copia_estado !== 'enviada')) return false;
     if (!q) return true;
     return [a.cliente_nombre, a.cliente_telefono, a.vendedor_nombre, a.vehiculo_especifico, a.notas]
       .some(x => String(x || '').toLowerCase().includes(q));
@@ -171,6 +181,7 @@ function fila(a){
         <span class="badge b-${urg}">${esc(et('urgencia', a.urgencia))}</span>
         ${a.estado !== 'nueva' ? `<span class="badge b-azul">${esc(et('estado', a.estado))}</span>` : ''}
         ${(a.bitacora || []).length ? `<span class="badge b-gris" title="notas de Finance">✎ ${(a.bitacora || []).length}</span>` : ''}
+        ${a.copia_estado && a.copia_estado !== 'enviada' ? `<span class="badge b-ambar" title="${esc(COPIA_MAL[a.copia_estado] || a.copia_estado)}">✉ no le llegó</span>` : ''}
       </div>
     </div>
     <div class="cifras">
@@ -189,6 +200,9 @@ function fila(a){
       <div class="dato"><div class="k">Busca</div><div class="v">${esc(tipos.join(' · ') || '—')}</div></div>
       <div class="dato"><div class="k">Co-buyer</div><div class="v">${esc(et('co_buyer', a.co_buyer))}</div></div>
       ${a.notas ? `<div class="notas">${esc(a.notas)}</div>` : ''}
+      ${a.copia_estado && a.copia_estado !== 'enviada'
+        ? `<div class="notas" style="background:#fffbeb;border-left-color:var(--yellow)"><b>La copia no le llegó a ${esc(a.vendedor_nombre)}</b> (${esc(a.vendedor_email)}) — ${esc(COPIA_MAL[a.copia_estado] || a.copia_estado)}. El link de arriba sí sirve para pasárselo.</div>`
+        : ''}
       ${bitacora(a)}
       <div class="acc">
         <a class="btn btn-ghost" style="text-decoration:none;display:inline-block" href="tel:${esc(String(a.cliente_telefono).replace(/\D/g,''))}">Llamar</a>

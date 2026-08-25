@@ -115,6 +115,16 @@ async function mandar(contactId: string, para: string, asunto: string, html: str
            detalle: String(j?.message ?? "").slice(0, 200) };
 }
 
+/** Deja escrito si la copia salió o no. Sin esto un correo que falla es un
+ *  silencio: el vendedor ve un aviso y quizá lo ignora, y nadie mas se entera. */
+async function anotar(id: string, estado: string, detalle = "") {
+  await fetch(`${SUPA}/rest/v1/ar_online_applications?id=eq.${id}`, {
+    method: "PATCH",
+    headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify({ copia_estado: estado, copia_detalle: detalle.slice(0, 300), copia_at: new Date().toISOString() }),
+  }).catch(() => {});
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   try {
@@ -128,13 +138,14 @@ Deno.serve(async (req) => {
     if (!a) return json({ ok: false, motivo: "no_existe" }, 404);
 
     const contactId = await contactoDelVendedor(a.vendedor_email, a.vendedor_nombre);
-    if (!contactId) return json({ ok: false, motivo: "sin_contacto" }, 502);
+    if (!contactId) { await anotar(a.id, "sin_contacto"); return json({ ok: false, motivo: "sin_contacto" }, 502); }
 
     const link = SITIO.replace(/\/?$/, "/") + a.codigo;
     const html = cuerpo(a, link);
     const asunto = `Online Application — ${a.cliente_nombre}`;
     const res = await mandar(contactId, a.vendedor_email, asunto, html);
-    if (!res.ok) return json({ ...res, para: a.vendedor_email }, 200);
+    if (!res.ok) { await anotar(a.id, res.motivo!, res.detalle ?? ""); return json({ ...res, para: a.vendedor_email }, 200); }
+    await anotar(a.id, "enviada", a.vendedor_email);
 
     // Copia opcional a Finance / Saúl, por si la quieren. Nunca frena la del vendedor.
     if (COPIA) {
