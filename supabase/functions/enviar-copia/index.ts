@@ -45,7 +45,14 @@ const fono = (t: unknown) => { const d = String(t ?? "").replace(/\D/g, "").slic
 /** El vendedor tiene que existir como contacto para que el CRM le pueda escribir.
  *  Se busca primero; solo se crea si no está, y siempre con la etiqueta
  *  "interno-vendedor" para que se pueda excluir de cualquier campaña de marketing. */
-async function contactoDelVendedor(email: string, nombre: string): Promise<string | null> {
+async function contactoDelVendedor(emailCrudo: string, nombre: string): Promise<string | null> {
+  // En minúsculas SIEMPRE. La busqueda del CRM distingue mayusculas: Anthony escribio
+  // "Anthony@auto-republic.com" y su contacto existia como "anthony@...", asi que no lo
+  // encontro, intento crearlo y el CRM lo rechazo por duplicado. Un correo es el mismo
+  // se escriba como se escriba.
+  const email = String(emailCrudo || "").trim().toLowerCase();
+  if (!email) return null;
+
   const b = await fetch(`${GHL}/contacts/search`, {
     method: "POST", headers: hGhl(),
     body: JSON.stringify({ locationId: GHL_LOC, pageLimit: 1,
@@ -65,7 +72,11 @@ async function contactoDelVendedor(email: string, nombre: string): Promise<strin
       source: "Online Application",
     }),
   }).then((r) => r.json()).catch(() => null);
-  return c?.contact?.id ?? null;
+  if (c?.contact?.id) return c.contact.id;
+  // Si aun asi choca por duplicado, el propio error trae el id del que ya existe.
+  // Sin esto se perdia el correo por una diferencia de mayusculas.
+  if (c?.meta?.contactId) return c.meta.contactId;
+  return null;
 }
 
 function cuerpo(a: Record<string, any>, link: string) {
@@ -145,9 +156,10 @@ Deno.serve(async (req) => {
     const link = SITIO.replace(/\/?$/, "/") + a.codigo;
     const html = cuerpo(a, link);
     const asunto = `Online Application — ${a.cliente_nombre}` + (a.deal_number ? ` (Deal #${a.deal_number})` : "");
-    const res = await mandar(contactId, a.vendedor_email, asunto, html);
-    if (!res.ok) { await anotar(a.id, res.motivo!, res.detalle ?? ""); return json({ ...res, para: a.vendedor_email }, 200); }
-    await anotar(a.id, "enviada", a.vendedor_email);
+    const destino = String(a.vendedor_email || "").trim().toLowerCase();
+    const res = await mandar(contactId, destino, asunto, html);
+    if (!res.ok) { await anotar(a.id, res.motivo!, res.detalle ?? ""); return json({ ...res, para: destino }, 200); }
+    await anotar(a.id, "enviada", destino);
 
     // Copia opcional a Finance / Saúl, por si la quieren. Nunca frena la del vendedor.
     if (COPIA) {
@@ -156,7 +168,7 @@ Deno.serve(async (req) => {
         if (cid) await mandar(cid, dir, asunto, html).catch(() => {});
       }
     }
-    return json({ ok: true, para: a.vendedor_email });
+    return json({ ok: true, para: destino });
   } catch (e) {
     return json({ ok: false, motivo: "error", detalle: String((e as Error)?.message ?? e).slice(0, 200) }, 500);
   }

@@ -249,6 +249,7 @@ function fila(a){
         <button class="btn btn-ghost" onclick="guardarDeal('${a.id}')">Guardar</button>
       </div>
       <div class="acc">
+        ${a.copia_estado !== 'enviada' ? `<button class="btn btn-ghost" onclick="reenviar('${a.codigo}', this)">Reenviar copia</button>` : ''}
         <a class="btn btn-ghost" style="text-decoration:none;display:inline-block" href="tel:${esc(String(a.cliente_telefono).replace(/\D/g,''))}">Llamar</a>
         <button class="btn btn-ghost" onclick="copiar('${a.codigo || a.id}', this)">Copiar link</button>
         <a class="btn btn-ghost" style="text-decoration:none;display:inline-block" href="${a.codigo ? a.codigo : 'a.html?id=' + a.id}" target="_blank">Abrir link</a>
@@ -304,6 +305,21 @@ async function agregarNota(id){
     alert('No se pudo guardar la nota. Revisa el internet — el texto sigue abajo.');
     const t2 = document.getElementById('nota-' + id); if (t2) t2.value = texto;
   }
+}
+
+/* Reintentar el correo sin depender de nadie. Sirve cuando fallo por algo que ya se
+   arreglo — un correo mal escrito, el CRM caido un momento. Si el correo pidio no
+   recibir mensajes de AR, esto no lo va a arreglar y lo dice. */
+async function reenviar(codigo, btn){
+  btn.disabled = true; btn.textContent = 'Mandando…';
+  try{
+    const r = await fetch(SUPA_URL + '/functions/v1/enviar-copia',
+      { method:'POST', headers: SUPA_H, body: JSON.stringify({ codigo }) });
+    const j = await r.json();
+    btn.textContent = j.ok ? 'Enviada ✓' : (COPIA_MAL[j.motivo] ? 'No se pudo' : 'No se pudo');
+    if (!j.ok && j.motivo === 'dado_de_baja') alert('Ese correo pidió no recibir mensajes de Auto Republic. No hay forma de mandárselo — que someta otra vez con otro correo.');
+    await cargar();
+  }catch(e){ btn.disabled = false; btn.textContent = 'Reenviar copia'; alert('No se pudo conectar.'); }
 }
 
 function abrir(id){ ABIERTA = ABIERTA === id ? null : id; pintar(); }

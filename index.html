@@ -329,7 +329,7 @@ async function enviar(){
   document.querySelectorAll('.field-input').forEach(i => i.classList.remove('invalid'));
   document.querySelectorAll('.opts').forEach(o => o.classList.remove('invalid'));
   req.forEach(([id,lbl]) => { if(!val(id)){ falta.push(lbl); document.getElementById(id).classList.add('invalid'); } });
-  const email = val('f_vend_email');
+  const email = val('f_vend_email').toLowerCase();   // un correo es el mismo en mayúsculas o minúsculas
   if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ falta.push('tu email no se ve válido'); document.getElementById('f_vend_email').classList.add('invalid'); }
   if (val('f_cli_tel').replace(/\D/g,'').length !== 10){ falta.push('teléfono completo (10 dígitos)'); document.getElementById('f_cli_tel').classList.add('invalid'); }
   [['trade_in','o_trade','trade-in (5)'],['placa','o_placa','tablilla o transferencia (6)'],['urgencia','o_urgencia','para cuándo lo necesita (7)'],['co_buyer','o_cobuyer','co-buyer (10)']]
