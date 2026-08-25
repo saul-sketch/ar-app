@@ -1,19 +1,26 @@
 // enviar-copia — le manda al vendedor la copia de su aplicación, apenas la somete.
 //
-// Vive aquí y no en el navegador por una razón: la llave del servicio de correo no
-// puede quedar en una página pública. El formulario solo dice "manda la del código
-// K7M2X9"; esta función busca la aplicación y arma el correo.
+// Manda por el CRM que Auto Republic YA paga (GoHighLevel). No hace falta contratar
+// ningún servicio de correo aparte: se comprobó que el token del CRM puede enviar.
 //
-// Si no hay llave configurada responde {ok:false, motivo:"sin_llave"} en vez de
-// romperse — el formulario ya guardó la aplicación y no debe fallarle al vendedor
-// por un correo. Un vacío nunca debe verse como un error de él.
+// Vive en el servidor y no en el navegador porque el token del CRM no puede quedar
+// en una página pública.
+//
+// Si algo falla responde el motivo en vez de romperse: la aplicación ya quedó
+// guardada y el vendedor ya tiene su link. Un problema de correo no puede parecerle
+// un error suyo ni dejarlo esperando.
 
-const RESEND = Deno.env.get("RESEND_API_KEY") ?? "";
-const DESDE  = Deno.env.get("CORREO_DESDE") ?? "Auto Republic <onboarding@resend.dev>";
-const COPIA  = Deno.env.get("CORREO_COPIA") ?? "";           // opcional: Finance / Saúl
-const SUPA   = Deno.env.get("SUPABASE_URL") ?? "";
-const SERVICE= Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const SITIO  = Deno.env.get("SITIO_URL") ?? "https://saul-sketch.github.io/ar-app/";
+const GHL_TOKEN = Deno.env.get("GHL_TOKEN") ?? "";
+const GHL_LOC   = Deno.env.get("GHL_LOCATION") ?? "";
+const COPIA     = Deno.env.get("CORREO_COPIA") ?? "";        // opcional: Finance / Saúl
+const SUPA      = Deno.env.get("SUPABASE_URL") ?? "";
+const SERVICE   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const SITIO     = Deno.env.get("SITIO_URL") ?? "https://saul-sketch.github.io/ar-app/";
+
+const GHL = "https://services.leadconnectorhq.com";
+const hGhl = (v = "2021-07-28") => ({
+  Authorization: `Bearer ${GHL_TOKEN}`, Version: v, "Content-Type": "application/json",
+});
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -33,6 +40,32 @@ const et = (c: string, v: string) => ET[c]?.[v] ?? v ?? "";
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 const money = (n: unknown) => (n === null || n === undefined || n === "") ? "—" : "$" + Math.round(Number(n)).toLocaleString("en-US");
 const fono = (t: unknown) => { const d = String(t ?? "").replace(/\D/g, "").slice(-10); return d.length === 10 ? `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}` : String(t ?? ""); };
+
+/** El vendedor tiene que existir como contacto para que el CRM le pueda escribir.
+ *  Se busca primero; solo se crea si no está, y siempre con la etiqueta
+ *  "interno-vendedor" para que se pueda excluir de cualquier campaña de marketing. */
+async function contactoDelVendedor(email: string, nombre: string): Promise<string | null> {
+  const b = await fetch(`${GHL}/contacts/search`, {
+    method: "POST", headers: hGhl(),
+    body: JSON.stringify({ locationId: GHL_LOC, pageLimit: 1,
+      filters: [{ field: "email", operator: "eq", value: email }] }),
+  }).then((r) => r.json()).catch(() => null);
+  const hallado = b?.contacts?.[0]?.id;
+  if (hallado) return hallado;
+
+  const partes = String(nombre || "").trim().split(/\s+/);
+  const c = await fetch(`${GHL}/contacts/`, {
+    method: "POST", headers: hGhl(),
+    body: JSON.stringify({
+      locationId: GHL_LOC, email,
+      firstName: partes[0] || "Vendedor",
+      lastName: partes.slice(1).join(" ") || "AR",
+      tags: ["interno-vendedor"],
+      source: "Online Application",
+    }),
+  }).then((r) => r.json()).catch(() => null);
+  return c?.contact?.id ?? null;
+}
 
 function cuerpo(a: Record<string, any>, link: string) {
   const tipos = (a.tipo_carro ?? []).filter((t: string) => t !== "especifico").map((t: string) => et("tipo_carro", t));
@@ -68,31 +101,48 @@ function cuerpo(a: Record<string, any>, link: string) {
   </div>`;
 }
 
+async function mandar(contactId: string, para: string, asunto: string, html: string) {
+  const r = await fetch(`${GHL}/conversations/messages`, {
+    method: "POST", headers: hGhl("2021-04-15"),
+    body: JSON.stringify({ type: "Email", contactId, emailTo: para, subject: asunto, html }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (j?.messageId || j?.conversationId) return { ok: true };
+  // "se dio de baja" es lo más común y tiene arreglo distinto a un fallo técnico:
+  // hay que resuscribirlo en el CRM, no reintentar.
+  const dado_de_baja = String(j?.canonicalCode ?? "").includes("UNSUBSCRIBED");
+  return { ok: false, motivo: dado_de_baja ? "dado_de_baja" : "correo_rechazado",
+           detalle: String(j?.message ?? "").slice(0, 200) };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   try {
     const { codigo } = await req.json();
     if (!codigo) return json({ ok: false, motivo: "sin_codigo" }, 400);
-    if (!RESEND) return json({ ok: false, motivo: "sin_llave" });   // no es un error del vendedor
+    if (!GHL_TOKEN || !GHL_LOC) return json({ ok: false, motivo: "sin_llave" });
 
     const r = await fetch(`${SUPA}/rest/v1/ar_online_applications?codigo=eq.${encodeURIComponent(codigo)}&select=*`,
       { headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` } });
     const [a] = await r.json();
     if (!a) return json({ ok: false, motivo: "no_existe" }, 404);
 
+    const contactId = await contactoDelVendedor(a.vendedor_email, a.vendedor_nombre);
+    if (!contactId) return json({ ok: false, motivo: "sin_contacto" }, 502);
+
     const link = SITIO.replace(/\/?$/, "/") + a.codigo;
-    const env = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${RESEND}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: DESDE,
-        to: [a.vendedor_email],
-        ...(COPIA ? { bcc: COPIA.split(",").map((x) => x.trim()).filter(Boolean) } : {}),
-        subject: `Online Application — ${a.cliente_nombre}`,
-        html: cuerpo(a, link),
-      }),
-    });
-    if (!env.ok) return json({ ok: false, motivo: "correo_rechazado", detalle: (await env.text()).slice(0, 300) }, 502);
+    const html = cuerpo(a, link);
+    const asunto = `Online Application — ${a.cliente_nombre}`;
+    const res = await mandar(contactId, a.vendedor_email, asunto, html);
+    if (!res.ok) return json({ ...res, para: a.vendedor_email }, 200);
+
+    // Copia opcional a Finance / Saúl, por si la quieren. Nunca frena la del vendedor.
+    if (COPIA) {
+      for (const dir of COPIA.split(",").map((x) => x.trim()).filter(Boolean)) {
+        const cid = await contactoDelVendedor(dir, "Finance AR").catch(() => null);
+        if (cid) await mandar(cid, dir, asunto, html).catch(() => {});
+      }
+    }
     return json({ ok: true, para: a.vendedor_email });
   } catch (e) {
     return json({ ok: false, motivo: "error", detalle: String((e as Error)?.message ?? e).slice(0, 200) }, 500);
