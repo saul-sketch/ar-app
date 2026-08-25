@@ -2,6 +2,22 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<script>
+/* Cache-buster (mismo que ar-sales-production). GitHub Pages sirve el HTML con
+   10 min de caché, así que sin esto un vendedor puede quedarse con la versión
+   vieja del formulario después de un cambio. Se recarga UNA vez con marca de
+   tiempo; la ventana de 30s evita que entre en bucle. La meta Cache-Control no
+   sirve: el encabezado de GitHub le gana. */
+(function(){try{
+  var u=new URL(location.href);
+  var t=parseInt(u.searchParams.get('_')||'0',36);
+  if(!t || (Date.now()-t)>30000){
+    u.searchParams.set('_', Date.now().toString(36));
+    location.replace(u.toString());
+  }
+}catch(e){}})();
+</script>
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <title>Online Application — Auto Republic</title>
