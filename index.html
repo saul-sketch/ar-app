@@ -199,6 +199,7 @@
       <span>🔗</span>
       <div>Este es el link con todas las respuestas. Pásaselo a Finance por mensaje — se abre solo, sin clave.</div>
     </div>
+    <div id="aviso-correo"></div>
     <div class="field">
       <div class="field-label">Link de esta aplicación</div>
       <input class="field-input" id="link-out" readonly onclick="this.select()" style="font-size:13px">
@@ -206,7 +207,7 @@
     <div class="acciones">
       <button class="btn btn-primary" onclick="copiarLink()" id="btn-copiar">Copiar link</button>
       <button class="btn btn-ghost" onclick="abrirLink()">Abrir</button>
-      <button class="btn btn-ghost" onclick="mandarmeCopia()">Enviarme copia</button>
+      <button class="btn btn-ghost" id="btn-copia-manual" onclick="mandarmeCopia()">Enviarme copia</button>
       <button class="btn btn-ghost" onclick="location.reload()">Otra aplicación</button>
     </div>
   </div>
@@ -342,10 +343,37 @@ async function enviar(){
     document.getElementById('listo-sub').textContent = `${fila.cliente_nombre} · ${tel(fila.cliente_telefono)}`;
     document.getElementById('link-out').value = linkPublico(fila.codigo);
     window.scrollTo({top:0, behavior:'smooth'});
+    // La copia sale sola. A propósito NO se espera a que termine: la aplicación ya
+    // está guardada y el vendedor ya tiene su link — un problema de correo no puede
+    // dejarlo esperando ni parecerle un error suyo.
+    enviarCopiaSola(fila.codigo);
   }catch(e){
     btn.disabled = false; btn.textContent = 'Someter aplicación';
     document.getElementById('error-box').innerHTML =
       `<div class="nota warn"><span>⚠️</span><div><strong>No se pudo enviar.</strong> Revisa el internet e intenta otra vez. Nada de lo que escribiste se perdió.</div></div>`;
+  }
+}
+
+async function enviarCopiaSola(codigo){
+  const aviso = document.getElementById('aviso-correo');
+  aviso.innerHTML = '<div class="qhint">Mandando copia a tu email…</div>';
+  try{
+    const r = await fetch(SUPA_URL + '/functions/v1/enviar-copia', {
+      method:'POST', headers: SUPA_H, body: JSON.stringify({ codigo })
+    });
+    const j = await r.json();
+    if (j.ok){
+      aviso.innerHTML = `<div class="nota" style="margin:0 0 16px"><span>📬</span><div>Copia enviada a <strong>${esc(j.para)}</strong>.</div></div>`;
+      document.getElementById('btn-copia-manual').style.display = 'none';
+    } else if (j.motivo === 'sin_llave'){
+      // Todavía no hay servicio de correo conectado: se lo decimos claro y le
+      // dejamos el botón de mandársela él mismo.
+      aviso.innerHTML = '<div class="qhint">El envío automático todavía no está conectado — usa el botón de abajo.</div>';
+    } else {
+      aviso.innerHTML = '<div class="nota warn" style="margin:0 0 16px"><span>⚠️</span><div>No salió la copia por email. El link de arriba sí sirve — cópialo y mándalo.</div></div>';
+    }
+  }catch(e){
+    aviso.innerHTML = '<div class="nota warn" style="margin:0 0 16px"><span>⚠️</span><div>No salió la copia por email. El link de arriba sí sirve — cópialo y mándalo.</div></div>';
   }
 }
 

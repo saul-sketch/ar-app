@@ -1,0 +1,4 @@
+project_id = "xwxjutaqouaeocvxawlw"
+
+[functions.enviar-copia]
+verify_jwt = false
