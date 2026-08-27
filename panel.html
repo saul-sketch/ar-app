@@ -46,6 +46,17 @@
   .det .dato .k{color:var(--gray-500);} .det .dato .v{font-weight:600;text-align:right;}
   .det .notas{background:#fffbeb;border-left:3px solid var(--yellow);border-radius:8px;padding:11px;font-size:13px;line-height:1.5;margin-top:10px;white-space:pre-wrap;}
   .det .acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+  .fila .ultima{margin-top:9px;padding:9px 11px;background:var(--gray-100);border-radius:9px;font-size:13px;line-height:1.45;color:var(--gray-700);}
+  .fila .ultima b{color:var(--gray-900);}
+  .verbox{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--gray-200);flex-wrap:wrap;}
+  .verbox .k{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-500);}
+  .verbox .quien{font-size:11.5px;color:var(--gray-500);}
+  .verbox .quien b{color:var(--gray-700);}
+  .vbtn{padding:9px 14px;border-radius:9px;border:1.5px solid var(--gray-200);background:var(--gray-100);color:var(--gray-700);font-size:12.5px;font-weight:700;font-family:inherit;cursor:pointer;min-height:40px;transition:all .15s;}
+  .vbtn:hover{background:var(--gray-200);}
+  .vbtn.on.verde{background:var(--green);border-color:var(--green);color:#fff;}
+  .vbtn.on.ambar{background:var(--yellow);border-color:var(--yellow);color:#fff;}
+  .vbtn.on.rojo{background:var(--red);border-color:var(--red);color:#fff;}
   .fila .deal{font-size:12px;font-weight:700;color:var(--blue);background:#dbeafe;border-radius:6px;padding:2px 7px;margin-left:6px;vertical-align:middle;}
   .dealbox{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--gray-200);flex-wrap:wrap;}
   .dealbox .k{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-500);}
@@ -110,6 +121,10 @@
       <button class="chip" data-f="hoy">Compran ya</button>
       <button class="chip" data-f="nueva">Sin tocar</button>
       <button class="chip" data-f="trabajando">Trabajándolas</button>
+      <button class="chip" data-f="sinrevisar">Sin revisar</button>
+      <button class="chip" data-f="aprobado">Aprobadas</button>
+      <button class="chip" data-f="posible">Con posibilidad</button>
+      <button class="chip" data-f="negado">Negadas</button>
       <button class="chip" data-f="sincopia">Sin copia ✉</button>
     </div>
     <div id="lista"><div class="cargando">Cargando…</div></div>
@@ -120,6 +135,8 @@
 let TODAS = [], FILTRO = 'todas', LOC = 'todas', BUSCA = '', ABIERTA = null, CODIGO = '', QUIEN = '';
 /* Si la copia al vendedor no salió, tiene que verse aquí. Un correo que falla no
    puede quedarse solo en la pantalla del vendedor, que quizá ni lo leyó. */
+/* Verde/ámbar/rojo: el veredicto es lo primero que hay que poder leer de un vistazo. */
+const VER_COLOR = { aprobado:'verde', posible:'ambar', negado:'rojo' };
 const COPIA_MAL = {
   dado_de_baja: 'ese correo pidió no recibir mensajes de AR — que use otro',
   correo_rechazado: 'el correo fue rechazado',
@@ -171,6 +188,8 @@ function visibles(){
     if (FILTRO === 'nueva' && a.estado !== 'nueva') return false;
     if (FILTRO === 'trabajando' && a.estado !== 'trabajando') return false;
     if (FILTRO === 'sincopia' && !(a.copia_estado && a.copia_estado !== 'enviada')) return false;
+    if (FILTRO === 'sinrevisar' && a.veredicto) return false;
+    if (['aprobado','posible','negado'].includes(FILTRO) && a.veredicto !== FILTRO) return false;
     if (!q) return true;
     return [a.cliente_nombre, a.cliente_telefono, a.vendedor_nombre, a.vehiculo_especifico, a.notas, a.deal_number]
       .some(x => String(x || '').toLowerCase().includes(q));
@@ -183,7 +202,7 @@ function pintar(){
   const hoyISO = new Date().toLocaleDateString('en-CA');
   const deHoy = base.filter(a => String(a.created_at).slice(0,10) === hoyISO).length;
   const urgentes = base.filter(a => a.urgencia === 'hoy' || a.urgencia === '2-3dias').length;
-  const sinTocar = base.filter(a => a.estado === 'nueva').length;
+  const sinRevisar = base.filter(a => !a.veredicto).length;
   // El botón "Sin tienda" solo aparece si de verdad hay alguna sin tienda.
   const sinTienda = TODAS.filter(a => !a.location).length;
   const cs = document.getElementById('chip-sin-tienda');
@@ -192,7 +211,7 @@ function pintar(){
     `<div class="kpi"><div class="n">${base.length}</div><div class="l">${LOC === 'todas' ? 'En total' : (LOC === 'sin' ? 'Sin tienda' : esc(LOC))}</div></div>
      <div class="kpi"><div class="n">${deHoy}</div><div class="l">Entraron hoy</div></div>
      <div class="kpi"><div class="n" style="color:var(--red)">${urgentes}</div><div class="l">Compran ya</div></div>
-     <div class="kpi"><div class="n" style="color:${sinTocar?'var(--yellow)':'inherit'}">${sinTocar}</div><div class="l">Sin tocar</div></div>`;
+     <div class="kpi"><div class="n" style="color:${sinRevisar?'var(--yellow)':'inherit'}">${sinRevisar}</div><div class="l">Sin revisar</div></div>`;
   document.getElementById('sub').textContent =
     TODAS.length ? `${v.length} de ${base.length}${LOC !== 'todas' ? ' en ' + (LOC === 'sin' ? 'sin tienda' : LOC) : ''} · la última ${cuandoRelativo(TODAS[0].created_at)}`
                  : 'Todavía no hay ninguna';
@@ -214,12 +233,21 @@ function fila(a){
         <div class="linea">${esc(tel(a.cliente_telefono))} · ${esc(a.vendedor_nombre)}${a.location ? ' · ' + esc(a.location) : ''} · ${esc(cuandoRelativo(a.created_at))}</div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${a.veredicto ? `<span class="badge b-${VER_COLOR[a.veredicto]}" title="${esc((a.veredicto_por||'') + (a.veredicto_at ? ' · ' + cuandoRelativo(a.veredicto_at) : ''))}">${esc(et('veredicto', a.veredicto))}</span>`
+                      : '<span class="badge b-gris">Sin revisar</span>'}
         <span class="badge b-${urg}">${esc(et('urgencia', a.urgencia))}</span>
         ${a.estado !== 'nueva' ? `<span class="badge b-azul">${esc(et('estado', a.estado))}</span>` : ''}
-        ${(a.bitacora || []).filter(x=>x.tipo!=='etapa').length ? `<span class="badge b-gris" title="notas de Finance">✎ ${(a.bitacora || []).filter(x=>x.tipo!=='etapa').length}</span>` : ''}
+        ${(a.bitacora || []).filter(x=>(x.tipo!=='etapa'&&x.tipo!=='veredicto')).length ? `<span class="badge b-gris" title="notas de Finance">✎ ${(a.bitacora || []).filter(x=>(x.tipo!=='etapa'&&x.tipo!=='veredicto')).length}</span>` : ''}
         ${a.copia_estado && a.copia_estado !== 'enviada' ? `<span class="badge b-ambar" title="${esc(COPIA_MAL[a.copia_estado] || a.copia_estado)}">✉ no le llegó</span>` : ''}
       </div>
     </div>
+    ${(() => {
+      // La última nota escrita, sin abrir la tarjeta. En las notas reales es donde
+      // está lo que de verdad hace falta saber: "necesita cosigner", "viene sábado
+      // 3:30", "need turbo pass". Tenerla que abrir una por una es perder el tiempo.
+      const n = (a.bitacora || []).filter(x => x.tipo !== 'etapa' && x.tipo !== 'veredicto').slice(-1)[0];
+      return n ? `<div class="ultima"><b>${esc(n.quien)}:</b> ${esc(n.texto)}</div>` : '';
+    })()}
     <div class="cifras">
       <div class="cif"><div class="n">${dinero(a.pago_mensual) || '—'}</div><div class="l">Mensual</div></div>
       <div class="cif"><div class="n">${dinero(a.down_hoy) || '—'}</div><div class="l">Down hoy</div></div>
@@ -242,6 +270,12 @@ function fila(a){
         ? `<div class="notas" style="background:#fffbeb;border-left-color:var(--yellow)"><b>La copia no le llegó a ${esc(a.vendedor_nombre)}</b> (${esc(a.vendedor_email)}) — ${esc(COPIA_MAL[a.copia_estado] || a.copia_estado)}. El link de arriba sí sirve para pasárselo.</div>`
         : ''}
       ${bitacora(a)}
+      <div class="verbox">
+        <span class="k">Veredicto</span>
+        ${['aprobado','posible','negado'].map(v =>
+          `<button class="vbtn ${a.veredicto===v?'on '+VER_COLOR[v]:''}" onclick="veredicto('${a.id}','${a.veredicto===v?'':v}')">${esc(et('veredicto', v))}</button>`).join('')}
+        ${a.veredicto_por ? `<span class="quien">revisada por <b>${esc(a.veredicto_por)}</b> · ${esc(cuandoRelativo(a.veredicto_at))}</span>` : ''}
+      </div>
       <div class="dealbox">
         <span class="k">Deal #</span>
         <input class="field-input" id="deal-${a.id}" value="${esc(a.deal_number || '')}" inputmode="numeric"
@@ -266,6 +300,8 @@ function bitacora(a){
   const b = Array.isArray(a.bitacora) ? a.bitacora : [];
   const items = b.map(n => n.tipo === 'etapa'
     ? `<div class="bit-etapa">↳ <b>${esc(n.quien)}</b> ${esc(n.texto)} · ${esc(bitCuando(n.cuando))}</div>`
+    : n.tipo === 'veredicto'
+    ? `<div class="bit-etapa">✓ <b>${esc(n.quien)}</b> ${esc(n.texto)} · ${esc(bitCuando(n.cuando))}</div>`
     : `<div class="bit-item">
       <div class="bit-ini">${esc(bitIniciales(n.quien))}</div>
       <div class="bit-cuerpo">
@@ -274,7 +310,7 @@ function bitacora(a){
       </div>
     </div>`).join('');
   return `<div class="bit">
-    <h4>Notas de Finance ${b.filter(x=>x.tipo!=='etapa').length ? `<span class="n">${b.filter(x=>x.tipo!=='etapa').length}</span>` : ''}</h4>
+    <h4>Notas de Finance ${b.filter(x=>(x.tipo!=='etapa'&&x.tipo!=='veredicto')).length ? `<span class="n">${b.filter(x=>(x.tipo!=='etapa'&&x.tipo!=='veredicto')).length}</span>` : ''}</h4>
     ${items || '<div class="bit-vacia">Todavía nadie ha escrito nada.</div>'}
     <div class="bit-nueva">
       <textarea id="nota-${a.id}" placeholder="Ej: crédito 400, no hay nada — pedir co-signer" onkeydown="if(event.key==='Enter'&&(event.metaKey||event.ctrlKey))agregarNota('${a.id}')"></textarea>
@@ -320,6 +356,23 @@ async function reenviar(codigo, btn){
     if (!j.ok && j.motivo === 'dado_de_baja') alert('Ese correo pidió no recibir mensajes de Auto Republic. No hay forma de mandárselo — que someta otra vez con otro correo.');
     await cargar();
   }catch(e){ btn.disabled = false; btn.textContent = 'Reenviar copia'; alert('No se pudo conectar.'); }
+}
+
+/* Poner el veredicto ES revisarla: queda con el nombre de quien lo puso, sin casilla
+   aparte que alguien tenga que acordarse de marcar. Volver a tocar el mismo lo quita. */
+async function veredicto(id, v){
+  const a = TODAS.find(x => x.id === id); if (!a) return;
+  const antes = { v: a.veredicto, por: a.veredicto_por, at: a.veredicto_at };
+  a.veredicto = v || null; a.veredicto_por = v ? QUIEN : null; a.veredicto_at = v ? new Date().toISOString() : null;
+  pintar();
+  try{
+    const r = await rpc('ar_oa_veredicto', { p_codigo: CODIGO, p_id: id, p_veredicto: v || null });
+    if (!Array.isArray(r) || !r.length) throw new Error('no se guardó');
+    Object.assign(a, r[0]); pintar();
+  }catch(e){
+    a.veredicto = antes.v; a.veredicto_por = antes.por; a.veredicto_at = antes.at; pintar();
+    alert('No se pudo guardar el veredicto. Revisa el internet.');
+  }
 }
 
 function abrir(id){ ABIERTA = ABIERTA === id ? null : id; pintar(); }
