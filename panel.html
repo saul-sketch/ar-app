@@ -46,6 +46,7 @@
   .det .dato .k{color:var(--gray-500);} .det .dato .v{font-weight:600;text-align:right;}
   .det .notas{background:#fffbeb;border-left:3px solid var(--yellow);border-radius:8px;padding:11px;font-size:13px;line-height:1.5;margin-top:10px;white-space:pre-wrap;}
   .det .acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+  .ftit{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-400);margin-right:2px;}
   .fila .ultima{margin-top:9px;padding:9px 11px;background:var(--gray-100);border-radius:9px;font-size:13px;line-height:1.45;color:var(--gray-700);}
   .fila .ultima b{color:var(--gray-900);}
   .verbox{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--gray-200);flex-wrap:wrap;}
@@ -115,24 +116,37 @@
       <button class="chip" data-loc="sin" id="chip-sin-tienda" style="display:none">Sin tienda</button>
       <button class="chip" onclick="salir()" style="margin-left:auto;color:var(--gray-500)">Salir</button>
     </div>
-    <div class="filtros">
-      <input class="field-input" id="buscar" placeholder="Buscar por cliente, teléfono, Deal # o vendedor...">
+    <!-- Cada fila filtra UNA cosa y las tres se combinan. Antes estaban revueltas en
+         una sola fila exclusiva: elegir "Sin tocar" (que mira la etapa) dejaba ver una
+         que ya estaba Negada, porque su etapa seguia en nueva. Las etiquetas que se
+         ven en la tarjeta y los botones de filtrar dicen ahora exactamente lo mismo. -->
+    <div class="filtros" style="margin-bottom:8px">
+      <span class="ftit">Veredicto</span>
+      <button class="chip on" data-v="todas">Todas</button>
+      <button class="chip" data-v="sinrevisar">Sin revisar</button>
+      <button class="chip" data-v="aprobado">Aprobadas</button>
+      <button class="chip" data-v="posible">Con posibilidad</button>
+      <button class="chip" data-v="negado">Negadas</button>
+    </div>
+    <div class="filtros" style="margin-bottom:8px">
+      <span class="ftit">Etapa</span>
       <button class="chip on" data-f="todas">Todas</button>
       <button class="chip" data-f="hoy">Compran ya</button>
-      <button class="chip" data-f="nueva">Sin tocar</button>
       <button class="chip" data-f="trabajando">Trabajándolas</button>
-      <button class="chip" data-f="sinrevisar">Sin revisar</button>
-      <button class="chip" data-f="aprobado">Aprobadas</button>
-      <button class="chip" data-f="posible">Con posibilidad</button>
-      <button class="chip" data-f="negado">Negadas</button>
+      <button class="chip" data-f="esperando">Esperando</button>
+      <button class="chip" data-f="cerrada">Cerradas</button>
       <button class="chip" data-f="sincopia">Sin copia ✉</button>
+    </div>
+    <div class="filtros">
+      <input class="field-input" id="buscar" placeholder="Buscar por cliente, teléfono, Deal # o vendedor...">
+      <button class="chip" onclick="limpiarFiltros()" id="chip-limpiar" style="display:none;color:var(--gray-500)">Quitar filtros</button>
     </div>
     <div id="lista"><div class="cargando">Cargando…</div></div>
   </div>
 </div>
 <script src="shared.js"></script>
 <script>
-let TODAS = [], FILTRO = 'todas', LOC = 'todas', BUSCA = '', ABIERTA = null, CODIGO = '', QUIEN = '';
+let TODAS = [], FILTRO = 'todas', VER = 'todas', LOC = 'todas', BUSCA = '', ABIERTA = null, CODIGO = '', QUIEN = '';
 /* Si la copia al vendedor no salió, tiene que verse aquí. Un correo que falla no
    puede quedarse solo en la pantalla del vendedor, que quizá ni lo leyó. */
 /* Verde/ámbar/rojo: el veredicto es lo primero que hay que poder leer de un vistazo. */
@@ -184,12 +198,12 @@ function deLaTienda(){
 function visibles(){
   const q = BUSCA.toLowerCase().trim();
   return deLaTienda().filter(a => {
+    // Veredicto y etapa son ejes distintos: se cruzan, no se pisan.
+    if (VER === 'sinrevisar' && a.veredicto) return false;
+    if (['aprobado','posible','negado'].includes(VER) && a.veredicto !== VER) return false;
     if (FILTRO === 'hoy' && !(a.urgencia === 'hoy' || a.urgencia === '2-3dias')) return false;
-    if (FILTRO === 'nueva' && a.estado !== 'nueva') return false;
-    if (FILTRO === 'trabajando' && a.estado !== 'trabajando') return false;
+    if (['trabajando','esperando','cerrada'].includes(FILTRO) && a.estado !== FILTRO) return false;
     if (FILTRO === 'sincopia' && !(a.copia_estado && a.copia_estado !== 'enviada')) return false;
-    if (FILTRO === 'sinrevisar' && a.veredicto) return false;
-    if (['aprobado','posible','negado'].includes(FILTRO) && a.veredicto !== FILTRO) return false;
     if (!q) return true;
     return [a.cliente_nombre, a.cliente_telefono, a.vendedor_nombre, a.vehiculo_especifico, a.notas, a.deal_number]
       .some(x => String(x || '').toLowerCase().includes(q));
@@ -207,6 +221,8 @@ function pintar(){
   const sinTienda = TODAS.filter(a => !a.location).length;
   const cs = document.getElementById('chip-sin-tienda');
   if (cs) cs.style.display = sinTienda ? '' : 'none';
+  const cl = document.getElementById('chip-limpiar');
+  if (cl) cl.style.display = (VER !== 'todas' || FILTRO !== 'todas' || LOC !== 'todas' || BUSCA) ? '' : 'none';
   document.getElementById('kpis').innerHTML =
     `<div class="kpi"><div class="n">${base.length}</div><div class="l">${LOC === 'todas' ? 'En total' : (LOC === 'sin' ? 'Sin tienda' : esc(LOC))}</div></div>
      <div class="kpi"><div class="n">${deHoy}</div><div class="l">Entraron hoy</div></div>
@@ -392,8 +408,20 @@ async function marcar(id, estado){
 document.getElementById('buscar').addEventListener('input', e => { BUSCA = e.target.value; pintar(); });
 document.querySelectorAll('.chip[data-f]').forEach(c => c.onclick = () => {
   document.querySelectorAll('.chip[data-f]').forEach(x => x.classList.remove('on'));
-  c.classList.add('on'); FILTRO = c.dataset.f; pintar();
+  c.classList.add('on'); FILTRO = c.dataset.f; ABIERTA = null; pintar();
 });
+document.querySelectorAll('.chip[data-v]').forEach(c => c.onclick = () => {
+  document.querySelectorAll('.chip[data-v]').forEach(x => x.classList.remove('on'));
+  c.classList.add('on'); VER = c.dataset.v; ABIERTA = null; pintar();
+});
+function limpiarFiltros(){
+  VER = 'todas'; FILTRO = 'todas'; LOC = 'todas'; BUSCA = '';
+  document.getElementById('buscar').value = '';
+  document.querySelectorAll('.chip[data-v]').forEach(x => x.classList.toggle('on', x.dataset.v === 'todas'));
+  document.querySelectorAll('.chip[data-f]').forEach(x => x.classList.toggle('on', x.dataset.f === 'todas'));
+  document.querySelectorAll('.chip[data-loc]').forEach(x => x.classList.toggle('on', x.dataset.loc === 'todas'));
+  ABIERTA = null; pintar();
+}
 document.querySelectorAll('.chip[data-loc]').forEach(c => c.onclick = () => {
   document.querySelectorAll('.chip[data-loc]').forEach(x => x.classList.remove('on'));
   c.classList.add('on'); LOC = c.dataset.loc; ABIERTA = null; pintar();
