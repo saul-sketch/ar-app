@@ -30,7 +30,7 @@
       <h1>Online Application</h1>
       <div class="subtitle">Finance Handoff · Auto Republic</div>
     </div>
-    <a href="panel.html">Ver todas &rarr;</a>
+    <a href="panel.html" id="link-mias">Ver las mías &rarr;</a>
   </div>
 
   <div class="body" id="pantalla-form">
@@ -245,6 +245,16 @@
 
 <script src="shared.js"></script>
 <script>
+// El link a "las mías" arrastra su identidad, para que no le pida código.
+(function(){
+  const q = new URLSearchParams(location.search);
+  const n = q.get('name') || q.get('user') || '', e = q.get('email') || '';
+  if (n || e){
+    const a = document.getElementById('link-mias');
+    a.href = 'panel.html?' + new URLSearchParams({ name: n, email: e }).toString();
+  }
+})();
+
 const sel = {};          // selección simple por grupo
 let tipos = [];          // pregunta 8: varias
 
@@ -294,7 +304,14 @@ document.getElementById('f_cli_tel').addEventListener('input', e => {
 const RECUERDA = 'ar_oa_vendedor';
 (function(){
   try{
+    // Si viene del menú del CRM, ahí vienen su nombre y su correo — no se los
+    // preguntamos otra vez. Lo que manda el CRM gana sobre lo guardado antes.
+    const q = new URLSearchParams(location.search);
+    const nCRM = (q.get('name') || q.get('user') || '').trim();
+    const eCRM = (q.get('email') || '').trim().toLowerCase();
     const v = JSON.parse(localStorage.getItem(RECUERDA) || '{}');
+    if (nCRM) v.nombre = nCRM;
+    if (eCRM) v.email  = eCRM;
     if (v.nombre) document.getElementById('f_vend_nombre').value = v.nombre;
     if (v.email)  document.getElementById('f_vend_email').value  = v.email;
     if (v.location){ sel.location = v.location;
