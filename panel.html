@@ -65,6 +65,24 @@
   .menu-n{font-size:11px;font-weight:700;opacity:.5;}
   .menu-buscar{width:100%;padding:10px 11px;margin-bottom:4px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:13.5px;font-family:inherit;background:var(--gray-100);min-height:40px;}
   .menu-buscar:focus{outline:none;border-color:var(--blue);background:#fff;}
+  .kpi-sub{font-size:11px;color:var(--gray-400);margin-top:5px;font-weight:600;}
+  .sect2{margin-top:26px;}
+  .sect2 h3{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.9px;color:var(--gray-500);margin-bottom:8px;}
+  .kpi-hint{font-size:13px;color:var(--gray-700);margin-bottom:12px;line-height:1.5;}
+  .kpi-hint b{color:var(--gray-900);}
+  .tabla-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1.5px solid var(--gray-200);border-radius:12px;}
+  .tabla{width:100%;border-collapse:collapse;min-width:520px;}
+  .tabla th{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--gray-400);text-align:center;padding:11px 10px;background:var(--gray-100);white-space:nowrap;}
+  .tabla th:first-child{text-align:left;}
+  .tabla td{font-size:13.5px;text-align:center;padding:11px 10px;border-top:1px solid var(--gray-100);white-space:nowrap;}
+  .tabla td.nom2{text-align:left;font-weight:700;color:var(--gray-900);}
+  .tabla tbody tr:hover{background:var(--gray-100);}
+  .barras{display:flex;flex-direction:column;gap:7px;}
+  .barra{display:flex;align-items:center;gap:10px;}
+  .barra-t{font-size:12.5px;color:var(--gray-700);flex:0 0 96px;}
+  .barra-p{flex:1;height:9px;background:var(--gray-100);border-radius:999px;overflow:hidden;}
+  .barra-p div{height:100%;border-radius:999px;transition:width .3s ease;}
+  .barra-n{font-size:12.5px;font-weight:700;flex:0 0 26px;text-align:right;}
   .menu-nada{padding:12px 11px;font-size:13px;color:var(--gray-400);}
   @media(max-width:520px){ .menu{flex:1 1 100%;} .menu-btn{max-width:none;width:100%;} .menu-lista{min-width:100%;} }
   .ftit{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-400);margin-right:2px;}
@@ -152,7 +170,8 @@
     <div class="filtros" style="margin-bottom:8px">
       <div class="menu" id="menu-tienda"></div>
       <div class="menu" id="menu-vendedor"></div>
-      <button class="chip" onclick="abrirFuera(this)" style="margin-left:auto">↗ Abrir fuera del CRM</button>
+      <button class="chip" onclick="verKpis()" id="chip-kpis" style="margin-left:auto">📊 KPIs</button>
+      <button class="chip" onclick="abrirFuera(this)">↗ Abrir fuera del CRM</button>
       <button class="chip" onclick="salir()" id="chip-salir" style="color:var(--gray-500)">Salir</button>
     </div>
     <!-- Cada fila filtra UNA cosa y las tres se combinan. Antes estaban revueltas en
@@ -181,6 +200,7 @@
       <button class="chip" onclick="limpiarFiltros()" id="chip-limpiar" style="display:none;color:var(--gray-500)">Quitar filtros</button>
     </div>
     <div id="lista"><div class="cargando">Cargando…</div></div>
+    <div id="kpi-vista" style="display:none"></div>
   </div>
 </div>
 <script src="shared.js"></script>
@@ -377,8 +397,139 @@ function visibles(){
   });
 }
 
+
+/* ── KPIs ─────────────────────────────────────────────────────────────────────
+   Para ver qué está pasando cada día sin abrir 25 tarjetas. Todo se calcula de lo
+   que ya está cargado — no hay una consulta aparte que se pueda desincronizar. */
+let KPI_PER = 'hoy', KPI_ON = false;
+
+function kpiRango(p){
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const d = n => { const x = new Date(hoy); x.setDate(x.getDate()+n); return x; };
+  if (p === 'hoy')    return [hoy, new Date(8.64e15), 'Hoy'];
+  if (p === 'ayer')   return [d(-1), hoy, 'Ayer'];
+  if (p === '7')      return [d(-6), new Date(8.64e15), 'Últimos 7 días'];
+  if (p === 'mes')    return [new Date(hoy.getFullYear(), hoy.getMonth(), 1), new Date(8.64e15), 'Este mes'];
+  return [new Date(0), new Date(8.64e15), 'Todo'];
+}
+const enRango = (iso, a, b) => { if (!iso) return false; const t = new Date(iso); return t >= a && t < b; };
+
+function verKpis(){
+  KPI_ON = !KPI_ON;
+  document.getElementById('chip-kpis').classList.toggle('on', KPI_ON);
+  document.getElementById('kpi-vista').style.display = KPI_ON ? '' : 'none';
+  ['lista','kpis'].forEach(id => { const e = document.getElementById(id); if (e) e.style.display = KPI_ON ? 'none' : ''; });
+  document.querySelectorAll('.filtros').forEach((f,i) => { if (i > 0) f.style.display = KPI_ON ? 'none' : ''; });
+  pintar();
+}
+
+function pintarKpis(){
+  const [a, b, etq] = kpiRango(KPI_PER);
+  const base = deLaTienda();                       // respeta tienda y vendedor elegidos
+  const recibidas = base.filter(x => enRango(x.created_at, a, b));
+  const revisadas = base.filter(x => enRango(x.veredicto_at, a, b));
+  const apro = revisadas.filter(x => x.veredicto === 'aprobado');
+  const nega = revisadas.filter(x => x.veredicto === 'negado');
+  const posi = revisadas.filter(x => x.veredicto === 'posible');
+  const sinRev = base.filter(x => !x.veredicto);
+  const masVieja = sinRev.slice().sort((x,y) => new Date(x.created_at) - new Date(y.created_at))[0];
+  const tasa = revisadas.length ? Math.round(apro.length / revisadas.length * 100) : null;
+
+  // Cuánto tardan en revisar: la mediana aguanta mejor un caso raro que el promedio.
+  const horas = base.filter(x => x.veredicto_at)
+    .map(x => (new Date(x.veredicto_at) - new Date(x.created_at)) / 36e5).sort((p,q) => p - q);
+  const med = horas.length ? horas[Math.floor(horas.length/2)] : null;
+  const tiempo = med === null ? '—' : (med < 1 ? Math.round(med*60) + ' min' : (med < 48 ? med.toFixed(1) + ' h' : (med/24).toFixed(1) + ' días'));
+
+  const dinero = arr => { const v = arr.map(x => Number(x.down_hoy)||0).filter(Boolean); return v.length ? '$' + Math.round(v.reduce((s,n)=>s+n,0)/v.length).toLocaleString('en-US') : '—'; };
+
+  // Tabla por vendedor
+  const porV = {};
+  base.forEach(x => {
+    const e = (x.vendedor_email||'').toLowerCase(); if (!e) return;
+    const o = porV[e] = porV[e] || { nombre: x.vendedor_nombre, tot:0, per:0, apro:0, nega:0, rev:0, sin:0 };
+    o.tot++;
+    if (enRango(x.created_at, a, b)) o.per++;
+    if (x.veredicto) { o.rev++; if (x.veredicto==='aprobado') o.apro++; if (x.veredicto==='negado') o.nega++; }
+    else o.sin++;
+  });
+  const filas = Object.values(porV).sort((p,q) => q.per - p.per || q.tot - p.tot);
+  const lider = filas.filter(f => f.per > 0)[0];
+
+  const tarjeta = (n, l, color, sub) =>
+    `<div class="kpi"><div class="n" ${color?`style="color:${color}"`:''}>${n}</div><div class="l">${esc(l)}</div>${sub?`<div class="kpi-sub">${esc(sub)}</div>`:''}</div>`;
+
+  document.getElementById('kpi-vista').innerHTML = `
+    <div class="filtros" style="margin-bottom:14px">
+      ${[['hoy','Hoy'],['ayer','Ayer'],['7','7 días'],['mes','Este mes'],['todo','Todo']]
+        .map(([v,t]) => `<button class="chip ${KPI_PER===v?'on':''}" onclick="KPI_PER='${v}';pintar()">${t}</button>`).join('')}
+      <span class="ftit" style="margin-left:auto">${esc(etq)}${LOC!=='todas'?' · '+esc(LOC):''}${VEND!=='todos'?' · '+esc((base[0]||{}).vendedor_nombre||''):''}</span>
+    </div>
+
+    <div class="kpis">
+      ${tarjeta(recibidas.length, 'Recibidas', null, etq)}
+      ${tarjeta(revisadas.length, 'Revisadas', null, etq)}
+      ${tarjeta(apro.length, 'Aprobadas', apro.length?'var(--green)':null, etq)}
+      ${tarjeta(nega.length, 'Negadas', nega.length?'var(--red)':null, etq)}
+    </div>
+
+    <div class="kpis" style="margin-top:10px">
+      ${tarjeta(tasa===null?'—':tasa+'%', 'De las revisadas, aprobadas', tasa===null?null:(tasa>=50?'var(--green)':tasa>=25?'var(--yellow)':'var(--red)'), posi.length?posi.length+' con posibilidad':'')}
+      ${tarjeta(tiempo, 'Tardan en revisar', null, 'mediana, histórico')}
+      ${tarjeta(sinRev.length, 'Sin revisar', sinRev.length?'var(--yellow)':'var(--green)', sinRev.length?'acumuladas':'al día ✓')}
+      ${tarjeta(masVieja ? cuandoRelativo(masVieja.created_at).replace('hace ','') : '—', 'La más vieja esperando', null, masVieja ? masVieja.cliente_nombre : '')}
+    </div>
+
+    <div class="sect2">
+      <h3>Por vendedor</h3>
+      <div class="kpi-hint">${lider ? `<b>${esc(lider.nombre)}</b> va de primero — ${lider.per} en ${etq.toLowerCase()}.` : `Nadie ha enviado en ${etq.toLowerCase()}.`}</div>
+      <div class="tabla-scroll">
+        <table class="tabla">
+          <thead><tr><th>Vendedor</th><th>${esc(etq)}</th><th>Total</th><th>Aprob.</th><th>Neg.</th><th>Sin revisar</th><th>%</th></tr></thead>
+          <tbody>${filas.map(f => `<tr>
+            <td class="nom2">${esc(f.nombre)}</td>
+            <td><b>${f.per||'—'}</b></td>
+            <td>${f.tot}</td>
+            <td style="color:${f.apro?'var(--green)':'var(--gray-300)'}">${f.apro||'—'}</td>
+            <td style="color:${f.nega?'var(--red)':'var(--gray-300)'}">${f.nega||'—'}</td>
+            <td style="color:${f.sin?'var(--yellow)':'var(--gray-300)'}">${f.sin||'—'}</td>
+            <td>${f.rev?Math.round(f.apro/f.rev*100)+'%':'—'}</td></tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sect2">
+      <h3>Cómo vienen</h3>
+      <div class="barras">
+        ${[['hoy','Compran hoy','var(--red)'],['2-3dias','En 2–3 días','var(--yellow)'],['semana','Esta semana','var(--blue)'],['mes','Este mes','var(--gray-400)'],['sin_fecha','Sin fecha','var(--gray-300)']]
+          .map(([v,t,c]) => { const n = recibidas.filter(x=>x.urgencia===v).length;
+            const pct = recibidas.length ? Math.round(n/recibidas.length*100) : 0;
+            return `<div class="barra"><div class="barra-t">${t}</div>
+              <div class="barra-p"><div style="width:${pct}%;background:${c}"></div></div>
+              <div class="barra-n">${n}</div></div>`; }).join('')}
+      </div>
+      <div class="kpi-hint" style="margin-top:12px">
+        Down promedio de las de ${etq.toLowerCase()}: <b>${dinero(recibidas)}</b> ·
+        con trade-in: <b>${recibidas.filter(x=>x.trade_in&&x.trade_in!=='no').length}</b> ·
+        transfieren placa: <b>${recibidas.filter(x=>x.placa==='transferencia').length}</b>
+      </div>
+    </div>
+
+    <div class="sect2">
+      <h3>Por tienda</h3>
+      <div class="tabla-scroll"><table class="tabla">
+        <thead><tr><th>Tienda</th><th>${esc(etq)}</th><th>Total</th><th>Sin revisar</th></tr></thead>
+        <tbody>${['Orlando','Kissimmee'].map(t => {
+          const tt = TODAS.filter(x => x.location === t);
+          return `<tr><td class="nom2">${t}</td><td><b>${tt.filter(x=>enRango(x.created_at,a,b)).length||'—'}</b></td><td>${tt.length}</td><td>${tt.filter(x=>!x.veredicto).length||'—'}</td></tr>`;
+        }).join('')}</tbody>
+      </table></div>
+    </div>`;
+}
+
 function pintar(){
   pintarMenus();
+  if (KPI_ON){ pintarKpis(); return; }
   const v = visibles();
   const base = deLaTienda();
   const hoyISO = new Date().toLocaleDateString('en-CA');
