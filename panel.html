@@ -48,6 +48,22 @@
   .det .acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
   .btn-fuera{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:9px;padding:8px 14px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;}
   .btn-fuera:hover{background:rgba(255,255,255,.22);}
+  .menu{position:relative;}
+  .menu-btn{display:flex;align-items:center;gap:9px;background:var(--gray-100);border:1.5px solid var(--gray-200);border-radius:10px;padding:8px 13px;min-height:44px;cursor:pointer;font-family:inherit;transition:all .15s;max-width:260px;}
+  .menu-btn:hover{border-color:var(--gray-300);background:var(--gray-200);}
+  .menu-btn.puesto{background:var(--primary);border-color:var(--primary);}
+  .menu-btn.puesto .menu-tit{color:rgba(255,255,255,.6);}
+  .menu-btn.puesto .menu-val,.menu-btn.puesto .menu-flecha{color:#fff;}
+  .menu-tit{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-400);}
+  .menu-val{font-size:13.5px;font-weight:700;color:var(--gray-900);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;}
+  .menu-flecha{font-size:11px;color:var(--gray-400);margin-left:auto;}
+  .menu-lista{display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:40;background:#fff;border:1.5px solid var(--gray-200);border-radius:12px;box-shadow:var(--shadow-lg);padding:5px;min-width:230px;max-height:320px;overflow-y:auto;}
+  .menu-lista.abierta{display:block;animation:fade .15s ease;}
+  .menu-op{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;text-align:left;background:none;border:0;border-radius:8px;padding:10px 11px;font-size:13.5px;font-family:inherit;color:var(--gray-700);cursor:pointer;min-height:40px;}
+  .menu-op:hover{background:var(--gray-100);}
+  .menu-op.on{background:var(--primary);color:#fff;font-weight:700;}
+  .menu-n{font-size:11px;font-weight:700;opacity:.5;}
+  @media(max-width:520px){ .menu{flex:1 1 100%;} .menu-btn{max-width:none;width:100%;} .menu-lista{min-width:100%;} }
   .ftit{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-400);margin-right:2px;}
   .fila .ultima{margin-top:9px;padding:9px 11px;background:var(--gray-100);border-radius:9px;font-size:13px;line-height:1.45;color:var(--gray-700);}
   .fila .ultima b{color:var(--gray-900);}
@@ -131,10 +147,8 @@
   <div class="body">
     <div class="kpis" id="kpis"></div>
     <div class="filtros" style="margin-bottom:8px">
-      <button class="chip on" data-loc="todas">Ambas tiendas</button>
-      <button class="chip" data-loc="Orlando">Orlando</button>
-      <button class="chip" data-loc="Kissimmee">Kissimmee</button>
-      <button class="chip" data-loc="sin" id="chip-sin-tienda" style="display:none">Sin tienda</button>
+      <div class="menu" id="menu-tienda"></div>
+      <div class="menu" id="menu-vendedor"></div>
       <button class="chip" onclick="abrirFuera(this)" style="margin-left:auto">↗ Abrir fuera del CRM</button>
       <button class="chip" onclick="salir()" id="chip-salir" style="color:var(--gray-500)">Salir</button>
     </div>
@@ -159,7 +173,6 @@
       <button class="chip" data-f="cerrada">Cerradas</button>
       <button class="chip" data-f="sincopia">Sin copia ✉</button>
     </div>
-    <div class="filtros" style="margin-bottom:8px" id="fila-vendedores"></div>
     <div class="filtros">
       <input class="field-input" id="buscar" placeholder="Buscar por cliente, teléfono, Deal # o vendedor...">
       <button class="chip" onclick="limpiarFiltros()" id="chip-limpiar" style="display:none;color:var(--gray-500)">Quitar filtros</button>
@@ -246,23 +259,61 @@ function deLaTienda(){
   return base;
 }
 
-/* La lista de vendedores se arma sola con quien haya sometido: no hay que mantenerla
-   a mano y nadie se queda fuera cuando entra gente nueva. */
-function pintarVendedores(){
-  const cont = document.getElementById('fila-vendedores'); if (!cont) return;
-  const por = {};
-  TODAS.forEach(a => {
-    const e = (a.vendedor_email || '').toLowerCase(); if (!e) return;
-    (por[e] = por[e] || { n: 0, nombre: a.vendedor_nombre }).n++;
-  });
-  const lista = Object.entries(por).sort((a,b) => b[1].n - a[1].n);
-  cont.innerHTML = '<span class="ftit">Vendedor</span>'
-    + `<button class="chip ${VEND==='todos'?'on':''}" data-vend="todos">Todos</button>`
-    + lista.map(([e,v]) => `<button class="chip ${VEND===e?'on':''}" data-vend="${esc(e)}">${esc(v.nombre)} <span style="opacity:.55">${v.n}</span></button>`).join('');
-  cont.querySelectorAll('.chip[data-vend]').forEach(c => c.onclick = () => {
-    VEND = c.dataset.vend; ABIERTA = null; pintar();
+/* Menú propio, no el del navegador: los nativos se ven distintos en cada teléfono y
+   no combinan con el resto. Se cierra al elegir, al tocar afuera y con Escape. */
+function menu(cont, titulo, opciones, valor, alElegir){
+  const sel = opciones.find(o => o.v === valor) || opciones[0];
+  const abierto = cont.dataset.abierto === '1';
+  cont.innerHTML = `
+    <button class="menu-btn ${valor !== opciones[0].v ? 'puesto' : ''}" type="button">
+      <span class="menu-tit">${esc(titulo)}</span>
+      <span class="menu-val">${esc(sel ? sel.t : '')}</span>
+      <span class="menu-flecha">▾</span>
+    </button>
+    <div class="menu-lista ${abierto ? 'abierta' : ''}">
+      ${opciones.map(o => `<button type="button" class="menu-op ${o.v === valor ? 'on' : ''}" data-v="${esc(o.v)}">
+          <span>${esc(o.t)}</span>${o.n !== undefined ? `<span class="menu-n">${o.n}</span>` : ''}</button>`).join('')}
+    </div>`;
+  cont.querySelector('.menu-btn').onclick = e => {
+    e.stopPropagation();
+    const y = cont.dataset.abierto === '1';
+    document.querySelectorAll('.menu').forEach(m => m.dataset.abierto = '0');
+    cont.dataset.abierto = y ? '0' : '1';
+    pintar();
+  };
+  cont.querySelectorAll('.menu-op').forEach(b => b.onclick = e => {
+    e.stopPropagation(); cont.dataset.abierto = '0'; ABIERTA = null; alElegir(b.dataset.v);
   });
 }
+document.addEventListener('click', () => {
+  if ([...document.querySelectorAll('.menu')].some(m => m.dataset.abierto === '1')){
+    document.querySelectorAll('.menu').forEach(m => m.dataset.abierto = '0'); pintar();
+  }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape'){ document.querySelectorAll('.menu').forEach(m => m.dataset.abierto='0'); pintar(); }
+});
+
+/* La lista de vendedores se arma sola con quien haya sometido: no hay que mantenerla
+   a mano y nadie se queda fuera cuando entra gente nueva. */
+function pintarMenus(){
+  const porTienda = {}, porVend = {};
+  TODAS.forEach(a => {
+    const t = a.location || 'sin'; porTienda[t] = (porTienda[t] || 0) + 1;
+    const e = (a.vendedor_email || '').toLowerCase(); if (!e) return;
+    (porVend[e] = porVend[e] || { n: 0, nombre: a.vendedor_nombre }).n++;
+  });
+  const opsT = [{ v:'todas', t:'Ambas tiendas', n: TODAS.length },
+                { v:'Orlando', t:'Orlando', n: porTienda.Orlando || 0 },
+                { v:'Kissimmee', t:'Kissimmee', n: porTienda.Kissimmee || 0 }];
+  if (porTienda.sin) opsT.push({ v:'sin', t:'Sin tienda', n: porTienda.sin });
+  menu(document.getElementById('menu-tienda'), 'Tienda', opsT, LOC, v => { LOC = v; pintar(); });
+
+  const opsV = [{ v:'todos', t:'Todos los vendedores', n: TODAS.length }].concat(
+    Object.entries(porVend).sort((a,b) => b[1].n - a[1].n).map(([e,x]) => ({ v:e, t:x.nombre, n:x.n })));
+  menu(document.getElementById('menu-vendedor'), 'Vendedor', opsV, VEND, v => { VEND = v; pintar(); });
+}
+
 function visibles(){
   const q = BUSCA.toLowerCase().trim();
   return deLaTienda().filter(a => {
@@ -279,17 +330,13 @@ function visibles(){
 }
 
 function pintar(){
-  pintarVendedores();
+  pintarMenus();
   const v = visibles();
   const base = deLaTienda();
   const hoyISO = new Date().toLocaleDateString('en-CA');
   const deHoy = base.filter(a => String(a.created_at).slice(0,10) === hoyISO).length;
   const urgentes = base.filter(a => a.urgencia === 'hoy' || a.urgencia === '2-3dias').length;
   const sinRevisar = base.filter(a => !a.veredicto).length;
-  // El botón "Sin tienda" solo aparece si de verdad hay alguna sin tienda.
-  const sinTienda = TODAS.filter(a => !a.location).length;
-  const cs = document.getElementById('chip-sin-tienda');
-  if (cs) cs.style.display = sinTienda ? '' : 'none';
   const cl = document.getElementById('chip-limpiar');
   if (cl) cl.style.display = (VER !== 'todas' || FILTRO !== 'todas' || LOC !== 'todas' || VEND !== 'todos' || BUSCA) ? '' : 'none';
   document.getElementById('kpis').innerHTML =
@@ -374,6 +421,8 @@ function fila(a){
         <a class="btn btn-ghost" style="text-decoration:none;display:inline-block" href="${a.codigo ? a.codigo : 'a.html?id=' + a.id}" target="_blank">Abrir link</a>
         ${['nueva','trabajando','esperando','cerrada'].filter(e => e !== a.estado)
           .map(e => `<button class="btn btn-ghost" onclick="marcar('${a.id}','${e}')">${esc(et('estado', e))}</button>`).join('')}
+        ${String(QUIEN).toLowerCase() === 'saul'
+          ? `<button class="btn btn-ghost" style="color:var(--red);margin-left:auto" onclick="borrar('${a.id}')">Borrar</button>` : ''}
       </div>
     </div>
   </div>`;
@@ -536,6 +585,23 @@ async function verMias(nombre, email){
   }).join('');
 }
 
+/* Borrar: solo Saúl, y NO destruye. La aplicación desaparece de todas las vistas pero
+   el registro queda — son datos de clientes reales y un clic equivocado no puede ser
+   irreversible. Si alguna vez hace falta devolver una, se puede. */
+async function borrar(id){
+  const a = TODAS.find(x => x.id === id); if (!a) return;
+  if (!confirm(`¿Borrar la aplicación de ${a.cliente_nombre}?\n\nDesaparece de la lista. Se puede recuperar si hace falta.`)) return;
+  const antes = TODAS.slice();
+  TODAS = TODAS.filter(x => x.id !== id); ABIERTA = null; pintar();
+  try{
+    const ok = await rpc('ar_oa_borrar', { p_codigo: CODIGO, p_id: id });
+    if (ok !== true) throw new Error('no se borró');
+  }catch(e){
+    TODAS = antes; pintar();
+    alert('No se pudo borrar. Solo Saúl puede, y hace falta internet.');
+  }
+}
+
 function abrir(id){ ABIERTA = ABIERTA === id ? null : id; pintar(); }
 function copiar(id, btn){
   const url = linkPublico(id);
@@ -564,13 +630,8 @@ function limpiarFiltros(){
   document.getElementById('buscar').value = '';
   document.querySelectorAll('.chip[data-v]').forEach(x => x.classList.toggle('on', x.dataset.v === 'todas'));
   document.querySelectorAll('.chip[data-f]').forEach(x => x.classList.toggle('on', x.dataset.f === 'todas'));
-  document.querySelectorAll('.chip[data-loc]').forEach(x => x.classList.toggle('on', x.dataset.loc === 'todas'));
   ABIERTA = null; pintar();
 }
-document.querySelectorAll('.chip[data-loc]').forEach(c => c.onclick = () => {
-  document.querySelectorAll('.chip[data-loc]').forEach(x => x.classList.remove('on'));
-  c.classList.add('on'); LOC = c.dataset.loc; ABIERTA = null; pintar();
-});
 /* Al abrir: si viene del menú del CRM, el propio CRM ya dice quién es.
    Manager -> el panel completo, sin código. Vendedor -> solo lo suyo. */
 (async function(){
