@@ -479,6 +479,13 @@ function pintarKpis(){
       ${tarjeta(sinRev.length, 'Sin revisar', sinRev.length?'var(--yellow)':'var(--green)', sinRev.length?'acumuladas':'al día ✓')}
       ${tarjeta(masVieja ? cuandoRelativo(masVieja.created_at).replace('hace ','') : '—', 'La más vieja esperando', null, masVieja ? masVieja.cliente_nombre : '')}
     </div>
+    <div class="kpis" style="margin-top:10px">
+      ${(() => { const sinLead = base.filter(x => !x.crm_contact_id).length;
+        return tarjeta(sinLead, 'Sin lead en el CRM', sinLead?'var(--yellow)':'var(--green)', sinLead?'no se les pudo dejar nota':'todas enganchadas ✓'); })()}
+      ${tarjeta(base.filter(x => x.crm_nota_id).length, 'Con nota en el CRM', null, 'la aplicación queda en el lead')}
+      ${tarjeta(recibidas.filter(x => x.deal_number).length + '/' + recibidas.length, 'Con Deal #', null, etq)}
+      ${tarjeta(base.filter(x => x.copia_estado && x.copia_estado !== 'enviada').length, 'Copias que no salieron', base.filter(x => x.copia_estado && x.copia_estado !== 'enviada').length?'var(--yellow)':null, 'al vendedor')}
+    </div>
 
     <div class="sect2">
       <h3>Por vendedor</h3>
@@ -570,6 +577,7 @@ function fila(a){
         ${a.estado !== 'nueva' ? `<span class="badge b-azul">${esc(et('estado', a.estado))}</span>` : ''}
         ${(a.bitacora || []).filter(x=>(x.tipo!=='etapa'&&x.tipo!=='veredicto')).length ? `<span class="badge b-gris" title="notas de Finance">✎ ${(a.bitacora || []).filter(x=>(x.tipo!=='etapa'&&x.tipo!=='veredicto')).length}</span>` : ''}
         ${a.copia_estado && a.copia_estado !== 'enviada' ? `<span class="badge b-ambar" title="${esc(COPIA_MAL[a.copia_estado] || a.copia_estado)}">✉ no le llegó</span>` : ''}
+        ${!a.crm_contact_id ? '<span class="badge b-gris" title="Este cliente no existe como lead en el CRM">sin lead</span>' : ''}
       </div>
     </div>
     ${(() => {
@@ -616,6 +624,7 @@ function fila(a){
       <div class="acc">
         ${a.copia_estado !== 'enviada' ? `<button class="btn btn-ghost" onclick="reenviar('${a.codigo}', this)">Reenviar copia</button>` : ''}
         <a class="btn btn-ghost" style="text-decoration:none;display:inline-block" href="tel:${esc(String(a.cliente_telefono).replace(/\D/g,''))}">Llamar</a>
+        ${a.crm_contact_id ? `<a class="btn btn-ghost" style="text-decoration:none;display:inline-block" target="_blank" href="https://app.smartwavedigital.io/v2/location/ez4QcQYqIRKvgT8fIQ22/contacts/detail/${esc(a.crm_contact_id)}">Ver en el CRM</a>` : ''}
         <button class="btn btn-ghost" onclick="copiar('${a.codigo || a.id}', this)">Copiar link</button>
         <a class="btn btn-ghost" style="text-decoration:none;display:inline-block" href="${a.codigo ? a.codigo : 'a.html?id=' + a.id}" target="_blank">Abrir link</a>
         ${['nueva','trabajando','esperando','cerrada'].filter(e => e !== a.estado)

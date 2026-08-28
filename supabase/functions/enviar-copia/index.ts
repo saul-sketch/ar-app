@@ -92,6 +92,46 @@ async function contactoDelVendedor(emailCrudo: string, nombre: string): Promise<
   return creado;
 }
 
+/** Encontrar el lead del cliente en el CRM, por telefono. Importa el formato: con
+ *  "contains" y 10 digitos no encuentra nada; hay que buscar +1 y los 10, exacto. */
+async function leadDelCliente(tel: string): Promise<string | null> {
+  const d = String(tel || "").replace(/\D/g, "").slice(-10);
+  if (d.length !== 10) return null;
+  const r = await fetch(`${GHL}/contacts/search`, {
+    method: "POST", headers: hGhl(),
+    body: JSON.stringify({ locationId: GHL_LOC, pageLimit: 1,
+      filters: [{ field: "phone", operator: "eq", value: "+1" + d }] }),
+  }).then((x) => x.json()).catch(() => null);
+  return r?.contacts?.[0]?.id ?? null;
+}
+
+/** Dejar la nota en el lead, con el link. Asi Finance ve la aplicacion desde el CRM,
+ *  donde ya trabaja, sin que nadie tenga que pegar nada a mano. */
+async function notaEnElLead(contactId: string, a: Record<string, any>, link: string) {
+  const tipos = (a.tipo_carro ?? []).filter((t: string) => t !== "especifico").map((t: string) => et("tipo_carro", t));
+  if (a.vehiculo_especifico) tipos.push(a.vehiculo_especifico);
+  const txt = [
+    "APLICACION ONLINE — " + link,
+    "",
+    `La lleno: ${a.vendedor_nombre}${a.location ? " (" + a.location + ")" : ""}`,
+    a.deal_number ? `Deal #${a.deal_number}` : "",
+    "",
+    `Quiere pagar: ${money(a.pago_mensual)} al mes`,
+    `Down hoy: ${money(a.down_hoy)}` + (a.down_max ? ` · podria llegar a ${money(a.down_max)}` : ""),
+    a.down_cuando ? `Lo tendria: ${a.down_cuando}` : "",
+    `Trade-in: ${et("trade_in", a.trade_in)}` + (a.trade_in === "debe" ? ` · debe ${money(a.trade_payoff)}` : ""),
+    `Placa: ${et("placa", a.placa)}`,
+    `Necesita comprar: ${et("urgencia", a.urgencia)}`,
+    tipos.length ? `Busca: ${tipos.join(" · ")}` : "",
+    `Co-buyer: ${et("co_buyer", a.co_buyer)}`,
+    a.notas ? "\nLo que dijo el cliente: " + a.notas : "",
+  ].filter(Boolean).join("\n");
+  const r = await fetch(`${GHL}/contacts/${contactId}/notes`, {
+    method: "POST", headers: hGhl(), body: JSON.stringify({ body: txt }),
+  }).then((x) => x.json()).catch(() => null);
+  return r?.note?.id ?? null;
+}
+
 function cuerpo(a: Record<string, any>, link: string) {
   const tipos = (a.tipo_carro ?? []).filter((t: string) => t !== "especifico").map((t: string) => et("tipo_carro", t));
   if (a.vehiculo_especifico) tipos.push(a.vehiculo_especifico);
@@ -173,6 +213,23 @@ Deno.serve(async (req) => {
     const res = await mandar(contactId, destino, asunto, html);
     if (!res.ok) { await anotar(a.id, res.motivo!, res.detalle ?? ""); return json({ ...res, para: destino }, 200); }
     await anotar(a.id, "enviada", destino);
+
+    // Enganchar con el lead del CRM y dejarle la nota. Va DESPUES del correo y sin
+    // frenarlo: si el cliente no esta en el CRM (pasa en 1 de cada 4) no es un error,
+    // simplemente no hay a quien pegarle la nota.
+    try{
+      if (!a.crm_contact_id) {
+        const cid = await leadDelCliente(a.cliente_telefono);
+        if (cid) {
+          const nid = await notaEnElLead(cid, a, link);
+          await fetch(`${SUPA}/rest/v1/ar_online_applications?id=eq.${a.id}`, {
+            method: "PATCH",
+            headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+            body: JSON.stringify({ crm_contact_id: cid, crm_nota_id: nid }),
+          }).catch(() => {});
+        }
+      }
+    }catch(_e){ /* nunca frena la copia */ }
 
     // Copia opcional a Finance / Saúl, por si la quieren. Nunca frena la del vendedor.
     if (COPIA) {
