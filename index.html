@@ -314,6 +314,20 @@ const RECUERDA = 'ar_oa_vendedor';
     if (eCRM) v.email  = eCRM;
     if (v.nombre) document.getElementById('f_vend_nombre').value = v.nombre;
     if (v.email)  document.getElementById('f_vend_email').value  = v.email;
+    if (nCRM || eCRM){
+      // Lo dice el CRM, no se escribe a mano. Asi es como se ensuciaron los datos
+      // viejos: "Saul L" y "SAUL LOZANO" eran la misma persona, y un dedazo dejo un
+      // correo en ".cpm" al que nunca le pudo llegar la copia.
+      ['f_vend_nombre','f_vend_email'].forEach(id => {
+        const el = document.getElementById(id);
+        el.readOnly = true;
+        el.style.background = 'var(--gray-200)';
+        el.style.color = 'var(--gray-500)';
+        el.title = 'Viene de tu usuario del CRM';
+      });
+      const h = document.querySelector('#o_location').closest('.sect').querySelector('.qhint');
+      if (h) h.textContent = 'Tu nombre y tu correo vienen de tu usuario del CRM.';
+    }
     if (v.location){ sel.location = v.location;
       document.querySelectorAll('#o_location .opt-btn').forEach(b => b.classList.toggle('on', b.dataset.v === v.location)); }
   }catch(e){}

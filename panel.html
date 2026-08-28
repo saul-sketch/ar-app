@@ -153,6 +153,7 @@
       <button class="chip" data-f="cerrada">Cerradas</button>
       <button class="chip" data-f="sincopia">Sin copia ✉</button>
     </div>
+    <div class="filtros" style="margin-bottom:8px" id="fila-vendedores"></div>
     <div class="filtros">
       <input class="field-input" id="buscar" placeholder="Buscar por cliente, teléfono, Deal # o vendedor...">
       <button class="chip" onclick="limpiarFiltros()" id="chip-limpiar" style="display:none;color:var(--gray-500)">Quitar filtros</button>
@@ -162,7 +163,7 @@
 </div>
 <script src="shared.js"></script>
 <script>
-let TODAS = [], FILTRO = 'todas', VER = 'todas', LOC = 'todas', BUSCA = '', ABIERTA = null, CODIGO = '', QUIEN = '', CRM = null;
+let TODAS = [], FILTRO = 'todas', VER = 'todas', LOC = 'todas', VEND = 'todos', BUSCA = '', ABIERTA = null, CODIGO = '', QUIEN = '', CRM = null;
 /* Si la copia al vendedor no salió, tiene que verse aquí. Un correo que falla no
    puede quedarse solo en la pantalla del vendedor, que quizá ni lo leyó. */
 /* Verde/ámbar/rojo: el veredicto es lo primero que hay que poder leer de un vistazo. */
@@ -208,9 +209,30 @@ async function cargar(){
    "compran ya". Y se aplica ANTES de los números de arriba, para que esos KPIs sean
    los de la tienda que estás mirando y no los de las dos juntas. */
 function deLaTienda(){
-  if (LOC === 'todas') return TODAS;
-  if (LOC === 'sin') return TODAS.filter(a => !a.location);
-  return TODAS.filter(a => a.location === LOC);
+  let base = TODAS;
+  if (LOC === 'sin') base = base.filter(a => !a.location);
+  else if (LOC !== 'todas') base = base.filter(a => a.location === LOC);
+  // El vendedor se cruza por CORREO, no por nombre: el correo es el que no cambia.
+  if (VEND !== 'todos') base = base.filter(a => (a.vendedor_email || '').toLowerCase() === VEND);
+  return base;
+}
+
+/* La lista de vendedores se arma sola con quien haya sometido: no hay que mantenerla
+   a mano y nadie se queda fuera cuando entra gente nueva. */
+function pintarVendedores(){
+  const cont = document.getElementById('fila-vendedores'); if (!cont) return;
+  const por = {};
+  TODAS.forEach(a => {
+    const e = (a.vendedor_email || '').toLowerCase(); if (!e) return;
+    (por[e] = por[e] || { n: 0, nombre: a.vendedor_nombre }).n++;
+  });
+  const lista = Object.entries(por).sort((a,b) => b[1].n - a[1].n);
+  cont.innerHTML = '<span class="ftit">Vendedor</span>'
+    + `<button class="chip ${VEND==='todos'?'on':''}" data-vend="todos">Todos</button>`
+    + lista.map(([e,v]) => `<button class="chip ${VEND===e?'on':''}" data-vend="${esc(e)}">${esc(v.nombre)} <span style="opacity:.55">${v.n}</span></button>`).join('');
+  cont.querySelectorAll('.chip[data-vend]').forEach(c => c.onclick = () => {
+    VEND = c.dataset.vend; ABIERTA = null; pintar();
+  });
 }
 function visibles(){
   const q = BUSCA.toLowerCase().trim();
@@ -228,6 +250,7 @@ function visibles(){
 }
 
 function pintar(){
+  pintarVendedores();
   const v = visibles();
   const base = deLaTienda();
   const hoyISO = new Date().toLocaleDateString('en-CA');
@@ -239,14 +262,14 @@ function pintar(){
   const cs = document.getElementById('chip-sin-tienda');
   if (cs) cs.style.display = sinTienda ? '' : 'none';
   const cl = document.getElementById('chip-limpiar');
-  if (cl) cl.style.display = (VER !== 'todas' || FILTRO !== 'todas' || LOC !== 'todas' || BUSCA) ? '' : 'none';
+  if (cl) cl.style.display = (VER !== 'todas' || FILTRO !== 'todas' || LOC !== 'todas' || VEND !== 'todos' || BUSCA) ? '' : 'none';
   document.getElementById('kpis').innerHTML =
     `<div class="kpi"><div class="n">${base.length}</div><div class="l">${LOC === 'todas' ? 'En total' : (LOC === 'sin' ? 'Sin tienda' : esc(LOC))}</div></div>
      <div class="kpi"><div class="n">${deHoy}</div><div class="l">Entraron hoy</div></div>
      <div class="kpi"><div class="n" style="color:var(--red)">${urgentes}</div><div class="l">Compran ya</div></div>
      <div class="kpi"><div class="n" style="color:${sinRevisar?'var(--yellow)':'inherit'}">${sinRevisar}</div><div class="l">Sin revisar</div></div>`;
   document.getElementById('sub').textContent =
-    TODAS.length ? `${v.length} de ${base.length}${LOC !== 'todas' ? ' en ' + (LOC === 'sin' ? 'sin tienda' : LOC) : ''} · la última ${cuandoRelativo(TODAS[0].created_at)}`
+    TODAS.length ? `${v.length} de ${base.length}${LOC !== 'todas' ? ' en ' + (LOC === 'sin' ? 'sin tienda' : LOC) : ''}${VEND !== 'todos' ? ' · ' + ((TODAS.find(a=>(a.vendedor_email||'').toLowerCase()===VEND)||{}).vendedor_nombre || '') : ''} · la última ${cuandoRelativo(TODAS[0].created_at)}`
                  : 'Todavía no hay ninguna';
 
   document.getElementById('lista').innerHTML = v.length ? v.map(fila).join('')
@@ -490,7 +513,7 @@ document.querySelectorAll('.chip[data-v]').forEach(c => c.onclick = () => {
   c.classList.add('on'); VER = c.dataset.v; ABIERTA = null; pintar();
 });
 function limpiarFiltros(){
-  VER = 'todas'; FILTRO = 'todas'; LOC = 'todas'; BUSCA = '';
+  VER = 'todas'; FILTRO = 'todas'; LOC = 'todas'; VEND = 'todos'; BUSCA = '';
   document.getElementById('buscar').value = '';
   document.querySelectorAll('.chip[data-v]').forEach(x => x.classList.toggle('on', x.dataset.v === 'todas'));
   document.querySelectorAll('.chip[data-f]').forEach(x => x.classList.toggle('on', x.dataset.f === 'todas'));
