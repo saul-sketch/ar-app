@@ -102,6 +102,7 @@
   .dealbox .k{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-500);}
   .dealbox .field-input{flex:1;min-width:120px;max-width:200px;padding:9px 11px;font-size:13.5px;min-height:40px;}
   .dealbox .btn{padding:9px 15px;font-size:12px;min-height:40px;}
+  .dealbox .deal-ok{font-size:12px;font-weight:700;color:var(--green);}
   .bit{margin-top:14px;padding-top:12px;border-top:1px solid var(--gray-200);}
   .bit h4{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-500);margin-bottom:9px;display:flex;align-items:center;gap:7px;}
   .bit h4 .n{background:var(--gray-100);border-radius:999px;padding:2px 7px;font-size:10px;color:var(--gray-700);}
@@ -620,6 +621,7 @@ function fila(a){
         <input class="field-input" id="deal-${a.id}" value="${esc(a.deal_number || '')}" inputmode="numeric"
                placeholder="ponlo cuando lo tengas" onkeydown="if(event.key==='Enter')guardarDeal('${a.id}')">
         <button class="btn btn-ghost" onclick="guardarDeal('${a.id}')">Guardar</button>
+        <span class="deal-ok"></span>
       </div>
       <div class="acc">
         ${a.copia_estado !== 'enviada' ? `<button class="btn btn-ghost" onclick="reenviar('${a.codigo}', this)">Reenviar copia</button>` : ''}
@@ -807,6 +809,29 @@ async function borrar(id){
   }catch(e){
     TODAS = antes; pintar();
     alert('No se pudo borrar. Solo Saúl puede, y hace falta internet.');
+  }
+}
+
+/* Muchas veces el Deal # todavía no existe cuando el vendedor llena el formulario.
+   Que Finance lo pueda poner después es lo que hace que la aplicación se pueda
+   cruzar con DealerCenter. */
+async function guardarDeal(id){
+  const inp = document.getElementById('deal-' + id);
+  const v = (inp.value || '').trim();
+  const a = TODAS.find(x => x.id === id);
+  const antes = a.deal_number || '';
+  if (v === antes) return;
+  a.deal_number = v || null; pintar();
+  try{
+    const r = await rpc('ar_oa_deal', { p_codigo: CODIGO, p_id: id, p_deal: v });
+    if (!Array.isArray(r) || !r.length) throw new Error('no se guardó');
+    // Se avisa en el propio recuadro: pintar() vuelve a dibujar el botón, así que
+    // cambiarle el texto al de antes no serviría de nada.
+    const c = document.querySelector('#deal-' + id + ' ~ .deal-ok, .dealbox .deal-ok');
+    if (c) { c.textContent = v ? 'Guardado ✓' : 'Quitado ✓'; setTimeout(() => { if (c.isConnected) c.textContent = ''; }, 2200); }
+  }catch(e){
+    a.deal_number = antes || null; pintar();
+    alert('No se pudo guardar el Deal #. Revisa el internet.');
   }
 }
 
