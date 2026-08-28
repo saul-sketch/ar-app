@@ -287,20 +287,49 @@ function ocupado(){
   return false;
 }
 
+/* Huella de los datos: si nada cambio, ni se toca la pantalla. La mayoria de los
+   refrescos no traen nada nuevo, y no redibujar es la unica forma segura de no
+   moverle nada a quien esta trabajando. */
+function huella(filas){
+  return filas.map(a => [a.id, a.estado, a.veredicto, a.deal_number,
+    (a.bitacora||[]).length, a.copia_estado, a.crm_contact_id].join('~')).join('|');
+}
+
+/* Redibujar sin sacarlo de donde estaba: se guarda a que altura esta y se devuelve
+   ahi mismo. Si tiene una tarjeta abierta, se la deja donde estaba en pantalla, que
+   es lo que de verdad se nota. */
+function pintarSinMover(){
+  const abierta = ABIERTA ? document.querySelector('.det.show') : null;
+  const anclaAntes = abierta ? abierta.closest('.fila').getBoundingClientRect().top : null;
+  const y = window.scrollY;
+  pintar();
+  if (anclaAntes !== null){
+    const ahora = document.querySelector('.det.show');
+    if (ahora){
+      const d = ahora.closest('.fila').getBoundingClientRect().top - anclaAntes;
+      window.scrollTo(0, window.scrollY + d);
+      return;
+    }
+  }
+  window.scrollTo(0, y);
+}
+
 async function refrescar(silencioso){
   if (!CODIGO) return;
   const filas = await rpc('ar_oa_todas', { p_codigo: CODIGO }).catch(() => null);
   if (!Array.isArray(filas)) return;
   ULTIMA = Date.now();
+  // Nada cambio: no se toca la pantalla. Es el caso mas comun.
+  if (huella(filas) === huella(TODAS)){ TODAS = filas; PENDIENTE = null; return; }
   if (!silencioso || !ocupado()){
     TODAS = filas; PENDIENTE = null;
     const av = document.getElementById('aviso-nuevas'); if (av) av.remove();
-    pintar(); return;
+    pintarSinMover(); return;
   }
   // Estaba escribiendo: se guarda aparte y se avisa. No se le borra lo que iba haciendo.
   PENDIENTE = filas;
   const nuevas = filas.length - TODAS.length;
-  if (nuevas > 0) avisoNuevas(nuevas);
+  avisoNuevas(nuevas > 0 ? nuevas : 0);
 }
 
 function avisoNuevas(n){
@@ -308,11 +337,13 @@ function avisoNuevas(n){
   if (!b){
     b = document.createElement('button');
     b.id = 'aviso-nuevas'; b.className = 'aviso-nuevas';
-    b.onclick = () => { if (PENDIENTE){ TODAS = PENDIENTE; PENDIENTE = null; } b.remove(); pintar(); };
+    b.onclick = () => { if (PENDIENTE){ TODAS = PENDIENTE; PENDIENTE = null; } b.remove(); pintarSinMover(); };
     const cont = document.querySelector('#panel .body');
     if (cont) cont.prepend(b);
   }
-  b.textContent = n === 1 ? '1 aplicación nueva — toca para verla' : n + ' aplicaciones nuevas — toca para verlas';
+  b.textContent = n === 0 ? 'Hay cambios nuevos — toca para verlos'
+                : n === 1 ? '1 aplicación nueva — toca para verla'
+                : n + ' aplicaciones nuevas — toca para verlas';
 }
 
 function arrancarRefresco(){
