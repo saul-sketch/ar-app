@@ -65,6 +65,8 @@
   .menu-n{font-size:11px;font-weight:700;opacity:.5;}
   .menu-buscar{width:100%;padding:10px 11px;margin-bottom:4px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:13.5px;font-family:inherit;background:var(--gray-100);min-height:40px;}
   .menu-buscar:focus{outline:none;border-color:var(--blue);background:#fff;}
+  .aviso-nuevas{display:block;width:100%;background:var(--primary);color:#fff;border:0;border-radius:11px;padding:12px 16px;font-size:13.5px;font-weight:700;font-family:inherit;cursor:pointer;margin-bottom:14px;text-align:left;animation:fade .25s ease;}
+  .aviso-nuevas:hover{background:#000;}
   .kpi-sub{font-size:11px;color:var(--gray-400);margin-top:5px;font-weight:600;}
   .sect2{margin-top:26px;}
   .sect2 h3{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.9px;color:var(--gray-500);margin-bottom:8px;}
@@ -266,9 +268,62 @@ function errorPuerta(msg){
   document.getElementById('puerta-error').innerHTML = `<div class="nota warn"><span>⚠️</span><div>${esc(msg)}</div></div>`;
 }
 async function cargar(){
-  // Desde el CRM el manager no escribió código, así que se pide con su identidad.
   const filas = await rpc('ar_oa_todas', { p_codigo: CODIGO }).catch(() => null);
-  if (Array.isArray(filas)) { TODAS = filas; pintar(); }
+  if (Array.isArray(filas)) { TODAS = filas; ULTIMA = Date.now(); pintar(); }
+}
+
+/* ── Que se actualice sola ────────────────────────────────────────────────────
+   El panel se queda abierto todo el día. Sin esto, un manager podía estar mirando
+   una lista de hace dos horas creyendo que era lo de ahora.
+   Lo delicado es NO interrumpir: si alguien está escribiendo una nota y la pantalla
+   se vuelve a dibujar, pierde lo que llevaba. Se trae lo nuevo siempre, pero solo se
+   redibuja cuando es seguro; si no, espera y avisa arriba. */
+let ULTIMA = 0, PENDIENTE = null, TIMER = null;
+
+function ocupado(){
+  const f = document.activeElement;
+  if (f && (f.tagName === 'TEXTAREA' || (f.tagName === 'INPUT' && f.id !== 'buscar'))) return true;
+  if ([...document.querySelectorAll('.menu')].some(m => m.dataset.abierto === '1')) return true;
+  return false;
+}
+
+async function refrescar(silencioso){
+  if (!CODIGO) return;
+  const filas = await rpc('ar_oa_todas', { p_codigo: CODIGO }).catch(() => null);
+  if (!Array.isArray(filas)) return;
+  ULTIMA = Date.now();
+  if (!silencioso || !ocupado()){
+    TODAS = filas; PENDIENTE = null;
+    const av = document.getElementById('aviso-nuevas'); if (av) av.remove();
+    pintar(); return;
+  }
+  // Estaba escribiendo: se guarda aparte y se avisa. No se le borra lo que iba haciendo.
+  PENDIENTE = filas;
+  const nuevas = filas.length - TODAS.length;
+  if (nuevas > 0) avisoNuevas(nuevas);
+}
+
+function avisoNuevas(n){
+  let b = document.getElementById('aviso-nuevas');
+  if (!b){
+    b = document.createElement('button');
+    b.id = 'aviso-nuevas'; b.className = 'aviso-nuevas';
+    b.onclick = () => { if (PENDIENTE){ TODAS = PENDIENTE; PENDIENTE = null; } b.remove(); pintar(); };
+    const cont = document.querySelector('#panel .body');
+    if (cont) cont.prepend(b);
+  }
+  b.textContent = n === 1 ? '1 aplicación nueva — toca para verla' : n + ' aplicaciones nuevas — toca para verlas';
+}
+
+function arrancarRefresco(){
+  if (TIMER) return;
+  // Cada minuto. Más seguido no aporta: no entran aplicaciones cada 10 segundos.
+  TIMER = setInterval(() => refrescar(true), 60000);
+  // Y al volver a la pestaña, que es cuando de verdad quiere ver lo último.
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && Date.now() - ULTIMA > 20000) refrescar(true);
+  });
+  window.addEventListener('focus', () => { if (Date.now() - ULTIMA > 20000) refrescar(true); });
 }
 
 /* La tienda es un filtro aparte de los de estado: elegir Orlando no debe borrar
@@ -554,6 +609,11 @@ function pintar(){
   document.getElementById('sub').textContent =
     TODAS.length ? `${v.length} de ${base.length}${LOC !== 'todas' ? ' en ' + (LOC === 'sin' ? 'sin tienda' : LOC) : ''}${VEND !== 'todos' ? ' · ' + ((TODAS.find(a=>(a.vendedor_email||'').toLowerCase()===VEND)||{}).vendedor_nombre || '') : ''} · la última ${cuandoRelativo(TODAS[0].created_at)}`
                  : 'Todavía no hay ninguna';
+  const sub = document.getElementById('sub');
+  if (sub && ULTIMA){
+    const seg = Math.round((Date.now() - ULTIMA)/1000);
+    sub.textContent += seg < 90 ? ' · al día' : ` · visto hace ${Math.round(seg/60)} min`;
+  }
 
   document.getElementById('lista').innerHTML = v.length ? v.map(fila).join('')
     : `<div class="vacio">${TODAS.length ? (LOC === 'todas' ? 'Nada con ese filtro.' : 'Nada con ese filtro en ' + esc(LOC === 'sin' ? 'aplicaciones sin tienda' : LOC) + '.') : 'Todavía no hay aplicaciones.<br>Cuando un vendedor mande la primera, aparece aquí sola.'}</div>`;
@@ -736,6 +796,7 @@ async function arrancarSesion(s){
     document.getElementById('yo').textContent = s.nombre;
     const cs = document.getElementById('chip-salir'); if (cs) cs.style.display = '';
     document.getElementById('panel').style.display = '';
+    arrancarRefresco();
     return cargar();
   }
   return verMias(s.nombre, s.email);
@@ -907,6 +968,7 @@ function limpiarFiltros(){
       CODIGO = 'crm:' + email + '|' + nombre;
       const cs2 = document.getElementById('chip-salir'); if (cs2) cs2.style.display = 'none';
       document.getElementById('panel').style.display = '';
+      arrancarRefresco();
       await cargar();
       return;
     }
