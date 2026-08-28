@@ -63,6 +63,9 @@
   .menu-op:hover{background:var(--gray-100);}
   .menu-op.on{background:var(--primary);color:#fff;font-weight:700;}
   .menu-n{font-size:11px;font-weight:700;opacity:.5;}
+  .menu-buscar{width:100%;padding:10px 11px;margin-bottom:4px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:13.5px;font-family:inherit;background:var(--gray-100);min-height:40px;}
+  .menu-buscar:focus{outline:none;border-color:var(--blue);background:#fff;}
+  .menu-nada{padding:12px 11px;font-size:13px;color:var(--gray-400);}
   @media(max-width:520px){ .menu{flex:1 1 100%;} .menu-btn{max-width:none;width:100%;} .menu-lista{min-width:100%;} }
   .ftit{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-400);margin-right:2px;}
   .fila .ultima{margin-top:9px;padding:9px 11px;background:var(--gray-100);border-radius:9px;font-size:13px;line-height:1.45;color:var(--gray-700);}
@@ -264,6 +267,20 @@ function deLaTienda(){
 function menu(cont, titulo, opciones, valor, alElegir){
   const sel = opciones.find(o => o.v === valor) || opciones[0];
   const abierto = cont.dataset.abierto === '1';
+  const filtro = (cont.dataset.filtro || '').toLowerCase();
+  // El buscador aparece solo cuando la lista es larga; con 3 opciones estorba.
+  const conBuscador = opciones.length > 8;
+  // Buscar por el PRINCIPIO de cada palabra, no por cualquier letra suelta: escribir
+  // "d" tiene que llevar a Diego, no traer a Anthony Calderon y Juviany Padron. Si
+  // nada empieza así, se cae a buscar en cualquier parte para no dejarlo sin nada.
+  const empieza = (t) => t.toLowerCase().split(/\s+/).some(p => p.startsWith(filtro));
+  let vistas = opciones;
+  if (filtro){
+    const porPrincipio = opciones.filter((o,i) => i === 0 || empieza(o.t));
+    vistas = porPrincipio.length > 1
+      ? porPrincipio
+      : opciones.filter((o,i) => i === 0 || o.t.toLowerCase().includes(filtro));
+  }
   cont.innerHTML = `
     <button class="menu-btn ${valor !== opciones[0].v ? 'puesto' : ''}" type="button">
       <span class="menu-tit">${esc(titulo)}</span>
@@ -271,27 +288,54 @@ function menu(cont, titulo, opciones, valor, alElegir){
       <span class="menu-flecha">▾</span>
     </button>
     <div class="menu-lista ${abierto ? 'abierta' : ''}">
-      ${opciones.map(o => `<button type="button" class="menu-op ${o.v === valor ? 'on' : ''}" data-v="${esc(o.v)}">
-          <span>${esc(o.t)}</span>${o.n !== undefined ? `<span class="menu-n">${o.n}</span>` : ''}</button>`).join('')}
+      ${conBuscador ? `<input class="menu-buscar" placeholder="Escribe una letra…" value="${esc(cont.dataset.filtro || '')}">` : ''}
+      ${vistas.length > (conBuscador && filtro ? 1 : 0)
+        ? vistas.map(o => `<button type="button" class="menu-op ${o.v === valor ? 'on' : ''}" data-v="${esc(o.v)}">
+            <span>${esc(o.t)}</span>${o.n !== undefined ? `<span class="menu-n">${o.n}</span>` : ''}</button>`).join('')
+        : '<div class="menu-nada">Nadie con esa letra</div>'}
     </div>`;
   cont.querySelector('.menu-btn').onclick = e => {
     e.stopPropagation();
     const y = cont.dataset.abierto === '1';
-    document.querySelectorAll('.menu').forEach(m => m.dataset.abierto = '0');
+    document.querySelectorAll('.menu').forEach(m => { m.dataset.abierto = '0'; m.dataset.filtro = ''; });
     cont.dataset.abierto = y ? '0' : '1';
     pintar();
+    if (!y){
+      const b = cont.querySelector('.menu-buscar');
+      // En el celular no se enfoca solo: el teclado taparía la lista de golpe.
+      if (b && window.innerWidth > 620) b.focus();
+    }
   };
-  cont.querySelectorAll('.menu-op').forEach(b => b.onclick = e => {
-    e.stopPropagation(); cont.dataset.abierto = '0'; ABIERTA = null; alElegir(b.dataset.v);
+  const b = cont.querySelector('.menu-buscar');
+  if (b){
+    b.onclick = e => e.stopPropagation();
+    b.oninput = e => {
+      cont.dataset.filtro = e.target.value;
+      const pos = e.target.selectionStart;
+      pintar();
+      const nb = cont.querySelector('.menu-buscar');
+      if (nb){ nb.focus(); nb.setSelectionRange(pos, pos); }
+    };
+    b.onkeydown = e => {
+      e.stopPropagation();
+      if (e.key === 'Enter'){
+        const primera = cont.querySelector('.menu-op[data-v]:not([data-v="' + opciones[0].v + '"])');
+        if (primera){ cont.dataset.abierto = '0'; cont.dataset.filtro = ''; ABIERTA = null; alElegir(primera.dataset.v); }
+      }
+      if (e.key === 'Escape'){ cont.dataset.abierto = '0'; cont.dataset.filtro = ''; pintar(); }
+    };
+  }
+  cont.querySelectorAll('.menu-op').forEach(x => x.onclick = e => {
+    e.stopPropagation(); cont.dataset.abierto = '0'; cont.dataset.filtro = ''; ABIERTA = null; alElegir(x.dataset.v);
   });
 }
 document.addEventListener('click', () => {
   if ([...document.querySelectorAll('.menu')].some(m => m.dataset.abierto === '1')){
-    document.querySelectorAll('.menu').forEach(m => m.dataset.abierto = '0'); pintar();
+    document.querySelectorAll('.menu').forEach(m => { m.dataset.abierto = '0'; m.dataset.filtro = ''; }); pintar();
   }
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape'){ document.querySelectorAll('.menu').forEach(m => m.dataset.abierto='0'); pintar(); }
+  if (e.key === 'Escape'){ document.querySelectorAll('.menu').forEach(m => { m.dataset.abierto='0'; m.dataset.filtro=''; }); pintar(); }
 });
 
 /* La lista de vendedores se arma sola con quien haya sometido: no hay que mantenerla
@@ -309,8 +353,12 @@ function pintarMenus(){
   if (porTienda.sin) opsT.push({ v:'sin', t:'Sin tienda', n: porTienda.sin });
   menu(document.getElementById('menu-tienda'), 'Tienda', opsT, LOC, v => { LOC = v; pintar(); });
 
+  // De la A a la Z: con 12 nombres es mas facil encontrar a alguien por su letra que
+  // por cuantas lleva. 'es' para que la Ñ y los acentos queden donde deben.
   const opsV = [{ v:'todos', t:'Todos los vendedores', n: TODAS.length }].concat(
-    Object.entries(porVend).sort((a,b) => b[1].n - a[1].n).map(([e,x]) => ({ v:e, t:x.nombre, n:x.n })));
+    Object.entries(porVend)
+      .map(([e,x]) => ({ v:e, t:x.nombre, n:x.n }))
+      .sort((a,b) => a.t.localeCompare(b.t, 'es', { sensitivity:'base' })));
   menu(document.getElementById('menu-vendedor'), 'Vendedor', opsV, VEND, v => { VEND = v; pintar(); });
 }
 
