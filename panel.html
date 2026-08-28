@@ -120,7 +120,6 @@
     </div>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <span id="yo" style="font-size:12px;color:rgba(255,255,255,.75);font-weight:600"></span>
-      <button id="btn-desbloquear" onclick="desbloquear()" style="display:none;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:9px;padding:8px 14px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer">🔒 Solo lectura</button>
       <a href="index.html">+ Nueva aplicación</a>
     </div>
   </div>
@@ -131,7 +130,7 @@
       <button class="chip" data-loc="Orlando">Orlando</button>
       <button class="chip" data-loc="Kissimmee">Kissimmee</button>
       <button class="chip" data-loc="sin" id="chip-sin-tienda" style="display:none">Sin tienda</button>
-      <button class="chip" onclick="salir()" style="margin-left:auto;color:var(--gray-500)">Salir</button>
+      <button class="chip" onclick="salir()" id="chip-salir" style="margin-left:auto;color:var(--gray-500)">Salir</button>
     </div>
     <!-- Cada fila filtra UNA cosa y las tres se combinan. Antes estaban revueltas en
          una sola fila exclusiva: elegir "Sin tocar" (que mira la etapa) dejaba ver una
@@ -192,21 +191,6 @@ async function entrar(){
   document.getElementById('panel').style.display = '';
   await cargar();
 }
-/* La identidad del CRM viaja en la dirección: sirve para leer, no para decidir. Para
-   poner un veredicto o una nota hace falta el código personal, que no viaja en ningún
-   lado. Se pide una vez por equipo y queda guardado. */
-async function desbloquear(){
-  const c = (prompt('Tu código personal (para poder escribir):') || '').trim();
-  if (!c) return;
-  const v = await rpc('ar_oa_quien', { p_codigo: c }).catch(() => null);
-  if (!v) return alert('Ese código no es.');
-  CODIGO = c; QUIEN = v;
-  try{ localStorage.setItem(GUARDA, c); }catch(e){}
-  document.getElementById('btn-desbloquear').style.display = 'none';
-  document.getElementById('yo').textContent = v;
-  pintar();
-}
-
 function salir(){
   try{ localStorage.removeItem(GUARDA); }catch(e){}
   location.reload();
@@ -216,9 +200,7 @@ function errorPuerta(msg){
 }
 async function cargar(){
   // Desde el CRM el manager no escribió código, así que se pide con su identidad.
-  const filas = CODIGO
-    ? await rpc('ar_oa_todas', { p_codigo: CODIGO }).catch(() => null)
-    : await rpc('ar_oa_todas_crm', { p_email: (CRM&&CRM.email)||'', p_nombre: (CRM&&CRM.nombre)||'' }).catch(() => null);
+  const filas = await rpc('ar_oa_todas', { p_codigo: CODIGO }).catch(() => null);
   if (Array.isArray(filas)) { TODAS = filas; pintar(); }
 }
 
@@ -321,24 +303,24 @@ function fila(a){
         ? `<div class="notas" style="background:#fffbeb;border-left-color:var(--yellow)"><b>La copia no le llegó a ${esc(a.vendedor_nombre)}</b> (${esc(a.vendedor_email)}) — ${esc(COPIA_MAL[a.copia_estado] || a.copia_estado)}. El link de arriba sí sirve para pasárselo.</div>`
         : ''}
       ${bitacora(a)}
-      ${!CODIGO ? '' : `<div class="verbox">
+      <div class="verbox">
         <span class="k">Veredicto</span>
         ${['aprobado','posible','negado'].map(v =>
           `<button class="vbtn ${a.veredicto===v?'on '+VER_COLOR[v]:''}" onclick="veredicto('${a.id}','${a.veredicto===v?'':v}')">${esc(et('veredicto', v))}</button>`).join('')}
-      </div>`}
-      ${a.veredicto_por ? `<div class="verbox"><span class="quien">revisada por <b>${esc(a.veredicto_por)}</b> · ${esc(cuandoRelativo(a.veredicto_at))}</span></div>` : ''}
-      ${!CODIGO ? '' : `<div class="dealbox">
+        ${a.veredicto_por ? `<span class="quien">revisada por <b>${esc(a.veredicto_por)}</b> · ${esc(cuandoRelativo(a.veredicto_at))}</span>` : ''}
+      </div>
+      <div class="dealbox">
         <span class="k">Deal #</span>
         <input class="field-input" id="deal-${a.id}" value="${esc(a.deal_number || '')}" inputmode="numeric"
                placeholder="ponlo cuando lo tengas" onkeydown="if(event.key==='Enter')guardarDeal('${a.id}')">
         <button class="btn btn-ghost" onclick="guardarDeal('${a.id}')">Guardar</button>
-      </div>`}
+      </div>
       <div class="acc">
         ${a.copia_estado !== 'enviada' ? `<button class="btn btn-ghost" onclick="reenviar('${a.codigo}', this)">Reenviar copia</button>` : ''}
         <a class="btn btn-ghost" style="text-decoration:none;display:inline-block" href="tel:${esc(String(a.cliente_telefono).replace(/\D/g,''))}">Llamar</a>
         <button class="btn btn-ghost" onclick="copiar('${a.codigo || a.id}', this)">Copiar link</button>
         <a class="btn btn-ghost" style="text-decoration:none;display:inline-block" href="${a.codigo ? a.codigo : 'a.html?id=' + a.id}" target="_blank">Abrir link</a>
-        ${!CODIGO ? '' : ['nueva','trabajando','esperando','cerrada'].filter(e => e !== a.estado)
+        ${['nueva','trabajando','esperando','cerrada'].filter(e => e !== a.estado)
           .map(e => `<button class="btn btn-ghost" onclick="marcar('${a.id}','${e}')">${esc(et('estado', e))}</button>`).join('')}
       </div>
     </div>
@@ -363,10 +345,10 @@ function bitacora(a){
   return `<div class="bit">
     <h4>Notas de Finance ${b.filter(x=>(x.tipo!=='etapa'&&x.tipo!=='veredicto')).length ? `<span class="n">${b.filter(x=>(x.tipo!=='etapa'&&x.tipo!=='veredicto')).length}</span>` : ''}</h4>
     ${items || '<div class="bit-vacia">Todavía nadie ha escrito nada.</div>'}
-    ${!CODIGO ? '<div class="bit-vacia">Entra con tu código (arriba) para escribir.</div>' : `<div class="bit-nueva">
+    <div class="bit-nueva">
       <textarea id="nota-${a.id}" placeholder="Ej: crédito 400, no hay nada — pedir co-signer" onkeydown="if(event.key==='Enter'&&(event.metaKey||event.ctrlKey))agregarNota('${a.id}')"></textarea>
       <button class="btn btn-primary" style="flex:0 0 auto;min-width:0;padding:10px 16px;font-size:13px" onclick="agregarNota('${a.id}')">Agregar</button>
-    </div>`}
+    </div>
   </div>`;
 }
 
@@ -533,10 +515,11 @@ document.querySelectorAll('.chip[data-loc]').forEach(c => c.onclick = () => {
       // Es manager: entra al panel completo con su nombre, sin escribir código.
       CODIGO = ''; QUIEN = quien; CRM = { nombre, email };
       document.getElementById('yo').textContent = quien;
-      // Si ya guardó su código en este equipo, entra escribiendo. Si no, lee nomás.
-      let g = ''; try{ g = localStorage.getItem(GUARDA) || ''; }catch(e){}
-      if (g){ const v = await rpc('ar_oa_quien', { p_codigo: g }).catch(() => null); if (v) { CODIGO = g; QUIEN = v; } }
-      if (!CODIGO) document.getElementById('btn-desbloquear').style.display = '';
+      // El propio usuario del CRM autoriza a escribir. Todo lo que haga —veredictos,
+      // notas, etapas— queda firmado con su nombre, igual que si hubiera entrado con
+      // su código. Ya no hay candado de solo lectura.
+      CODIGO = 'crm:' + email + '|' + nombre;
+      const cs2 = document.getElementById('chip-salir'); if (cs2) cs2.style.display = 'none';
       document.getElementById('panel').style.display = '';
       await cargar();
       return;
