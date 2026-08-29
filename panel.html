@@ -67,6 +67,24 @@
   .menu-buscar:focus{outline:none;border-color:var(--blue);background:#fff;}
   .aviso-nuevas{display:block;width:100%;background:var(--primary);color:#fff;border:0;border-radius:11px;padding:12px 16px;font-size:13.5px;font-weight:700;font-family:inherit;cursor:pointer;margin-bottom:14px;text-align:left;animation:fade .25s ease;}
   .aviso-nuevas:hover{background:#000;}
+  #banda{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
+  #banda:empty{display:none;}
+  .banda-b{display:block;width:100%;text-align:left;border:0;border-radius:11px;padding:13px 16px;font-size:14px;font-family:inherit;cursor:pointer;transition:all .15s;line-height:1.4;}
+  .banda-b b{font-weight:800;}
+  .banda-b.rojo{background:#fee2e2;color:#991b1b;border-left:4px solid var(--red);}
+  .banda-b.rojo:hover{background:#fecaca;}
+  .banda-b.azul{background:#dbeafe;color:#1e40af;border-left:4px solid var(--blue);}
+  .banda-b.azul:hover{background:#bfdbfe;}
+
+  /* En el celular los filtros ocupaban toda la pantalla antes de la primera tarjeta.
+     Se pliegan detrás de un boton: lo que importa es la lista, no los controles. */
+  .filtros-tog{display:none;}
+  @media(max-width:620px){
+    .filtros-tog{display:block;width:100%;background:var(--gray-100);border:1.5px solid var(--gray-200);border-radius:10px;padding:11px 14px;font-size:13px;font-weight:700;font-family:inherit;color:var(--gray-700);cursor:pointer;min-height:44px;margin-bottom:10px;text-align:left;}
+    #filtros-caja{display:none;}
+    #filtros-caja.abierta{display:block;}
+    .kpis{grid-template-columns:repeat(2,1fr);}
+  }
   .kpi-sub{font-size:11px;color:var(--gray-400);margin-top:5px;font-weight:600;}
   .sect2{margin-top:26px;}
   .sect2 h3{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.9px;color:var(--gray-500);margin-bottom:8px;}
@@ -169,6 +187,7 @@
     </div>
   </div>
   <div class="body">
+    <div id="banda"></div>
     <div class="kpis" id="kpis"></div>
     <div class="filtros" style="margin-bottom:8px">
       <div class="menu" id="menu-tienda"></div>
@@ -181,6 +200,8 @@
          una sola fila exclusiva: elegir "Sin tocar" (que mira la etapa) dejaba ver una
          que ya estaba Negada, porque su etapa seguia en nueva. Las etiquetas que se
          ven en la tarjeta y los botones de filtrar dicen ahora exactamente lo mismo. -->
+    <button class="filtros-tog" onclick="const c=document.getElementById('filtros-caja');c.classList.toggle('abierta');this.textContent=(c.classList.contains('abierta')?'▴ Ocultar filtros':'▾ Filtros y búsqueda')">▾ Filtros y búsqueda</button>
+    <div id="filtros-caja">
     <div class="filtros" style="margin-bottom:8px">
       <span class="ftit">Veredicto</span>
       <button class="chip on" data-v="todas">Todas</button>
@@ -202,13 +223,14 @@
       <input class="field-input" id="buscar" placeholder="Buscar por cliente, teléfono, Deal # o vendedor...">
       <button class="chip" onclick="limpiarFiltros()" id="chip-limpiar" style="display:none;color:var(--gray-500)">Quitar filtros</button>
     </div>
+    </div>
     <div id="lista"><div class="cargando">Cargando…</div></div>
     <div id="kpi-vista" style="display:none"></div>
   </div>
 </div>
 <script src="shared.js"></script>
 <script>
-let TODAS = [], FILTRO = 'todas', VER = 'todas', LOC = 'todas', VEND = 'todos', BUSCA = '', ABIERTA = null, CODIGO = '', QUIEN = '', CRM = null;
+let TODAS = [], FILTRO = 'todas', VER = 'todas', LOC = 'todas', VEND = 'todos', BUSCA = '', ABIERTA = null, CODIGO = '', QUIEN = '', CRM = null, SOLO_HOY = false;
 /* Si la copia al vendedor no salió, tiene que verse aquí. Un correo que falla no
    puede quedarse solo en la pantalla del vendedor, que quizá ni lo leyó. */
 /* Verde/ámbar/rojo: el veredicto es lo primero que hay que poder leer de un vistazo. */
@@ -469,12 +491,34 @@ function pintarMenus(){
   menu(document.getElementById('menu-vendedor'), 'Vendedor', opsV, VEND, v => { VEND = v; pintar(); });
 }
 
+/* Cuánto quema cada aplicación. Ordenar por fecha de llegada entierra lo que duele:
+   la que dijo "compro HOY" y lleva 3 días esperando quedaba al fondo de la lista.
+   Manda: primero quien viene al dealer hoy, después las urgentes sin revisar segun
+   lo que llevan esperando, y de ultimo lo ya resuelto. */
+const PESO_URG = { hoy: 4, '2-3dias': 3, semana: 2, mes: 1, sin_fecha: 0.5 };
+function quema(a){
+  const h = (Date.now() - new Date(a.created_at)) / 36e5;
+  let p = 0;
+  if (vieneHoy(a)) p += 10000;                       // lo de hoy va primero, siempre
+  if (!a.veredicto) p += h * (PESO_URG[a.urgencia] || 1);
+  else p -= 1000;                                    // ya resuelta: al final
+  if (a.estado === 'cerrada') p -= 2000;
+  return p;
+}
+function vieneHoy(a){
+  if (!a.visita_fecha) return false;
+  const hoy = new Date(); const f = String(a.visita_fecha).slice(0,10);
+  return f === hoy.toLocaleDateString('en-CA') && a.estado !== 'cerrada';
+}
+function horasEsperando(a){ return (Date.now() - new Date(a.created_at)) / 36e5; }
+
 function visibles(){
   const q = BUSCA.toLowerCase().trim();
   return deLaTienda().filter(a => {
     // Veredicto y etapa son ejes distintos: se cruzan, no se pisan.
     if (VER === 'sinrevisar' && a.veredicto) return false;
     if (['aprobado','posible','negado'].includes(VER) && a.veredicto !== VER) return false;
+    if (SOLO_HOY && !vieneHoy(a)) return false;
     if (FILTRO === 'hoy' && !(a.urgencia === 'hoy' || a.urgencia === '2-3dias')) return false;
     if (['trabajando','esperando','cerrada'].includes(FILTRO) && a.estado !== FILTRO) return false;
     if (FILTRO === 'sincopia' && !(a.copia_estado && a.copia_estado !== 'enviada')) return false;
@@ -626,12 +670,13 @@ function pintar(){
   if (KPI_ON){ pintarKpis(); return; }
   const v = visibles();
   const base = deLaTienda();
+  bandaAlerta(base);
   const hoyISO = new Date().toLocaleDateString('en-CA');
   const deHoy = base.filter(a => String(a.created_at).slice(0,10) === hoyISO).length;
   const urgentes = base.filter(a => a.urgencia === 'hoy' || a.urgencia === '2-3dias').length;
   const sinRevisar = base.filter(a => !a.veredicto).length;
   const cl = document.getElementById('chip-limpiar');
-  if (cl) cl.style.display = (VER !== 'todas' || FILTRO !== 'todas' || LOC !== 'todas' || VEND !== 'todos' || BUSCA) ? '' : 'none';
+  if (cl) cl.style.display = (VER !== 'todas' || FILTRO !== 'todas' || LOC !== 'todas' || VEND !== 'todos' || BUSCA || SOLO_HOY) ? '' : 'none';
   document.getElementById('kpis').innerHTML =
     `<div class="kpi"><div class="n">${base.length}</div><div class="l">${LOC === 'todas' ? 'En total' : (LOC === 'sin' ? 'Sin tienda' : esc(LOC))}</div></div>
      <div class="kpi"><div class="n">${deHoy}</div><div class="l">Entraron hoy</div></div>
@@ -646,8 +691,23 @@ function pintar(){
     sub.textContent += seg < 90 ? ' · al día' : ` · visto hace ${Math.round(seg/60)} min`;
   }
 
+  v.sort((x,y) => quema(y) - quema(x));
   document.getElementById('lista').innerHTML = v.length ? v.map(fila).join('')
     : `<div class="vacio">${TODAS.length ? (LOC === 'todas' ? 'Nada con ese filtro.' : 'Nada con ese filtro en ' + esc(LOC === 'sin' ? 'aplicaciones sin tienda' : LOC) + '.') : 'Todavía no hay aplicaciones.<br>Cuando un vendedor mande la primera, aparece aquí sola.'}</div>`;
+}
+
+/* Lo primero que se ve al abrir. Si hay algo quemandose, que te encuentre a ti. */
+function bandaAlerta(base){
+  const cont = document.getElementById('banda'); if (!cont) return;
+  const hoy = base.filter(vieneHoy);
+  const viejas = base.filter(a => !a.veredicto && horasEsperando(a) > 24 && (a.urgencia === 'hoy' || a.urgencia === '2-3dias'));
+  if (!hoy.length && !viejas.length){ cont.innerHTML = ''; return; }
+  const partes = [];
+  if (viejas.length) partes.push(`<button class="banda-b rojo" onclick="VER='sinrevisar';FILTRO='hoy';ABIERTA=null;pintar()">
+      <b>${viejas.length}</b> urgente${viejas.length>1?'s':''} sin revisar · la más vieja lleva <b>${Math.round(Math.max(...viejas.map(horasEsperando)))} h</b></button>`);
+  if (hoy.length) partes.push(`<button class="banda-b azul" onclick="VER='todas';FILTRO='todas';BUSCA='';document.getElementById('buscar').value='';ABIERTA=null;SOLO_HOY=true;pintar()">
+      <b>${hoy.length}</b> cliente${hoy.length>1?'s vienen':' viene'} hoy al dealer</button>`);
+  cont.innerHTML = partes.join('');
 }
 
 function fila(a){
@@ -662,7 +722,12 @@ function fila(a){
         <div class="nom">${esc(a.cliente_nombre)}${a.deal_number ? ` <span class="deal">#${esc(a.deal_number)}</span>` : ''}</div>
         <div class="linea">${esc(tel(a.cliente_telefono))} · ${esc(a.vendedor_nombre)}${a.location ? ' · ' + esc(a.location) : ''} · ${esc(cuandoRelativo(a.created_at))}</div>
       </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        ${vieneHoy(a) ? `<span class="badge b-azul" style="font-size:12px">📍 VIENE HOY${a.visita_hora ? ' ' + esc(a.visita_hora) : ''}</span>` : ''}
+        ${!a.veredicto ? (() => { const h = horasEsperando(a);
+            const c = h > 48 ? 'rojo' : h > 24 ? 'ambar' : 'gris';
+            const t = h < 1 ? Math.round(h*60) + ' min' : h < 48 ? Math.round(h) + ' h' : Math.round(h/24) + ' días';
+            return `<span class="badge b-${c}" title="lleva esperando">⏱ ${t}</span>`; })() : ''}
         ${a.veredicto ? `<span class="badge b-${VER_COLOR[a.veredicto]}" title="${esc((a.veredicto_por||'') + (a.veredicto_at ? ' · ' + cuandoRelativo(a.veredicto_at) : ''))}">${esc(et('veredicto', a.veredicto))}</span>`
                       : '<span class="badge b-gris">Sin revisar</span>'}
         <span class="badge b-${urg}">${esc(et('urgencia', a.urgencia))}</span>
@@ -951,7 +1016,7 @@ document.querySelectorAll('.chip[data-v]').forEach(c => c.onclick = () => {
   c.classList.add('on'); VER = c.dataset.v; ABIERTA = null; pintar();
 });
 function limpiarFiltros(){
-  VER = 'todas'; FILTRO = 'todas'; LOC = 'todas'; VEND = 'todos'; BUSCA = '';
+  VER = 'todas'; FILTRO = 'todas'; LOC = 'todas'; VEND = 'todos'; BUSCA = ''; SOLO_HOY = false;
   document.getElementById('buscar').value = '';
   document.querySelectorAll('.chip[data-v]').forEach(x => x.classList.toggle('on', x.dataset.v === 'todas'));
   document.querySelectorAll('.chip[data-f]').forEach(x => x.classList.toggle('on', x.dataset.f === 'todas'));
