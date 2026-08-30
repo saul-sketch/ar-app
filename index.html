@@ -53,7 +53,7 @@
         </div>
       </div>
       <div class="field" style="margin-top:12px">
-        <div class="field-label">Tienda</div>
+        <div class="field-label">Tienda<span class="req">*</span></div>
         <div class="opts" id="o_location">
           <button type="button" class="opt-btn" data-v="Orlando">Orlando</button>
           <button type="button" class="opt-btn" data-v="Kissimmee">Kissimmee</button>
@@ -363,6 +363,7 @@ async function enviar(){
   const email = val('f_vend_email').toLowerCase();   // un correo es el mismo en mayúsculas o minúsculas
   if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ falta.push('tu email no se ve válido'); document.getElementById('f_vend_email').classList.add('invalid'); }
   if (val('f_cli_tel').replace(/\D/g,'').length !== 10){ falta.push('teléfono completo (10 dígitos)'); document.getElementById('f_cli_tel').classList.add('invalid'); }
+  if(!sel.location){ falta.push('tu tienda'); document.getElementById('o_location').classList.add('invalid'); }
   [['trade_in','o_trade','trade-in (5)'],['placa','o_placa','tablilla o transferencia (6)'],['urgencia','o_urgencia','para cuándo lo necesita (7)'],['co_buyer','o_cobuyer','co-buyer (10)']]
     .forEach(([k,id,lbl]) => { if(!sel[k]){ falta.push(lbl); document.getElementById(id).classList.add('invalid'); } });
   if (falta.length) return marcarFalta(falta);
