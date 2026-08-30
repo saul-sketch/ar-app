@@ -1,0 +1,8 @@
+-- Cada 15 minutos revisa si hay aplicaciones olvidadas y avisa al canal.
+-- El Authorization real va con la llave anon del proyecto (se pone al crear el job,
+-- no se guarda aqui).
+-- select cron.schedule('recordatorios-aplicaciones', '*/15 * * * *',
+--   $$ select net.http_post(
+--        url := 'https://xwxjutaqouaeocvxawlw.supabase.co/functions/v1/recordatorios',
+--        headers := jsonb_build_object('Content-Type','application/json','Authorization','Bearer <ANON>'),
+--        body := '{}'::jsonb) $$);

@@ -2,3 +2,6 @@ project_id = "xwxjutaqouaeocvxawlw"
 
 [functions.enviar-copia]
 verify_jwt = false
+
+[functions.recordatorios]
+verify_jwt = false
