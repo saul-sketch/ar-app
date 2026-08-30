@@ -752,6 +752,7 @@ function fila(a){
       ${a.placa ? `<div class="cif"><div class="n" style="font-size:13px;font-weight:600">${esc(a.placa === 'transferencia' ? 'Transfiere' : a.placa === 'nueva' ? 'Nueva' : 'No sabe')}</div><div class="l">Placa</div></div>` : ''}
     </div>
     <div class="det ${abierta?'show':''}" onclick="event.stopPropagation()">
+      <div class="dato"><div class="k">Se envió</div><div class="v">${esc(fechaHora(a.created_at))}</div></div>
       ${a.down_cuando ? `<div class="dato"><div class="k">¿Para cuándo tendría el down?</div><div class="v">${esc(a.down_cuando)}</div></div>` : ''}
       ${a.trade_in === 'debe' ? `
         <div class="dato"><div class="k">VIN del trade</div><div class="v">${esc(a.trade_vin || '—')}</div></div>

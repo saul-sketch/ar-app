@@ -17,6 +17,19 @@ function fechaLarga(iso){
   const d = new Date(String(iso).slice(0,10) + 'T00:00:00');
   return `${d.getDate()} de ${MESES[d.getMonth()]} ${d.getFullYear()}`;
 }
+/* Fecha y hora exactas del este (Orlando). El "hace 6 h" sirve para saber si algo
+   está fresco, pero para hablar con un cliente hace falta la hora real: "entró a las
+   9:14 pm" es un dato distinto de "entró hace rato". */
+function fechaHora(iso){
+  if(!iso) return '';
+  try{
+    const d = new Date(iso);
+    const f = d.toLocaleDateString('es-ES', { timeZone:'America/New_York', day:'numeric', month:'short' });
+    const h = d.toLocaleTimeString('es-ES', { timeZone:'America/New_York', hour:'numeric', minute:'2-digit', hour12:true });
+    return f + ' · ' + h.replace('a. m.','am').replace('p. m.','pm');
+  }catch(e){ return ''; }
+}
+
 function cuandoRelativo(iso){
   if(!iso) return '';
   const d = new Date(iso), ahora = new Date();

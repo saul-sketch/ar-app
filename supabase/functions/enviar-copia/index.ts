@@ -16,6 +16,7 @@ const COPIA     = Deno.env.get("CORREO_COPIA") ?? "";        // opcional: Financ
 const SUPA      = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const SITIO     = Deno.env.get("SITIO_URL") ?? "https://saul-sketch.github.io/ar-app/";
+const DISCORD   = Deno.env.get("DISCORD_APLICACIONES") ?? "";   // canal de aplicaciones
 
 const GHL = "https://services.leadconnectorhq.com";
 const hGhl = (v = "2021-07-28") => ({
@@ -41,6 +42,15 @@ const et = (c: string, v: string) => ET[c]?.[v] ?? v ?? "";
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 const money = (n: unknown) => (n === null || n === undefined || n === "") ? "—" : "$" + Math.round(Number(n)).toLocaleString("en-US");
 const fono = (t: unknown) => { const d = String(t ?? "").replace(/\D/g, "").slice(-10); return d.length === 10 ? `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}` : String(t ?? ""); };
+// Hora del este (Orlando): para hablar con un cliente hace falta la hora real.
+const fechaHora = (iso: string) => {
+  try{
+    const d = new Date(iso);
+    const f = d.toLocaleDateString("es-ES", { timeZone:"America/New_York", day:"numeric", month:"short" });
+    const h = d.toLocaleTimeString("es-ES", { timeZone:"America/New_York", hour:"numeric", minute:"2-digit", hour12:true });
+    return f + " · " + h.replace("a. m.","am").replace("p. m.","pm");
+  }catch(_e){ return ""; }
+};
 
 /** El vendedor tiene que existir como contacto para que el CRM le pueda escribir.
  *  Se busca primero; solo se crea si no está, y siempre con la etiqueta
@@ -114,6 +124,7 @@ async function notaEnElLead(contactId: string, a: Record<string, any>, link: str
     "APLICACION ONLINE — " + link,
     "",
     `La lleno: ${a.vendedor_nombre}${a.location ? " (" + a.location + ")" : ""}`,
+    `Enviada: ${fechaHora(a.created_at)}`,
     a.deal_number ? `Deal #${a.deal_number}` : "",
     "",
     `Quiere pagar: ${money(a.pago_mensual)} al mes`,
@@ -147,6 +158,7 @@ function cuerpo(a: Record<string, any>, link: string) {
       <div style="background:#f3f4f6;border-radius:10px;padding:14px;margin-bottom:16px">
         <div style="font-size:19px;font-weight:700">${esc(a.cliente_nombre)}${a.deal_number ? ` <span style="font-size:14px;color:#3b82f6;background:#dbeafe;border-radius:6px;padding:2px 8px">Deal #${esc(a.deal_number)}</span>` : ""}</div>
         <div style="font-size:16px;color:#3b82f6;font-weight:600;margin-top:2px">${esc(fono(a.cliente_telefono))}</div>
+        <div style="font-size:12px;color:#6b7280;margin-top:6px">Enviada ${esc(fechaHora(a.created_at))}</div>
       </div>
       <table style="width:100%;border-collapse:collapse">
         ${fila("Quiere pagar mensual", money(a.pago_mensual))}
@@ -191,6 +203,41 @@ async function anotar(id: string, estado: string, detalle = "") {
   }).catch(() => {});
 }
 
+/** Avisar al canal de Discord. Se manda de una vez al someter: es lo unico que hace
+ *  que alguien se entere sin tener que abrir el panel. Nunca frena nada — si no hay
+ *  canal configurado o falla, la aplicacion ya quedo guardada igual. */
+async function aDiscord(a: Record<string, any>, link: string) {
+  if (!DISCORD) return;
+  const urg = et("urgencia", a.urgencia);
+  const corre = a.urgencia === "hoy" || a.urgencia === "2-3dias";
+  const campos = [
+    { name: "Vendedor", value: `${a.vendedor_nombre}${a.location ? " · " + a.location : ""}`, inline: true },
+    { name: "Necesita comprar", value: urg || "—", inline: true },
+    { name: "Mensual", value: money(a.pago_mensual), inline: true },
+    { name: "Down hoy", value: money(a.down_hoy), inline: true },
+    { name: "Trade-in", value: et("trade_in", a.trade_in) || "—", inline: true },
+    { name: "Placa", value: et("placa", a.placa) || "—", inline: true },
+  ];
+  if (a.visita_fecha) campos.push({ name: "Viene al dealer", value: `${a.visita_fecha}${a.visita_hora ? " · " + a.visita_hora : ""}`, inline: true });
+  if (a.deal_number) campos.push({ name: "Deal #", value: String(a.deal_number), inline: true });
+  if (a.notas) campos.push({ name: "Lo que dijo el cliente", value: String(a.notas).slice(0, 900), inline: false });
+
+  await fetch(DISCORD, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      content: corre ? "**Compra ya** — conviene mirarla pronto" : "",
+      embeds: [{
+        title: `${a.cliente_nombre}${a.deal_number ? " · #" + a.deal_number : ""}`,
+        url: link,
+        description: `${fono(a.cliente_telefono)}\nEnviada ${fechaHora(a.created_at)}`,
+        color: corre ? 0xef4444 : 0x1a1a2e,
+        fields: campos,
+        footer: { text: "Aplicación online · Auto Republic" },
+      }],
+    }),
+  }).catch(() => {});
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   try {
@@ -207,6 +254,8 @@ Deno.serve(async (req) => {
     if (!contactId) { await anotar(a.id, "sin_contacto"); return json({ ok: false, motivo: "sin_contacto" }, 502); }
 
     const link = SITIO.replace(/\/?$/, "/") + a.codigo;
+    // Primero el aviso: es lo que hace que alguien se entere. No espera al correo.
+    aDiscord(a, link).catch(() => {});
     const html = cuerpo(a, link);
     const asunto = `Online Application — ${a.cliente_nombre}` + (a.deal_number ? ` (Deal #${a.deal_number})` : "");
     const destino = String(a.vendedor_email || "").trim().toLowerCase();
