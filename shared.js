@@ -53,7 +53,10 @@ const ETIQUETAS = {
   tipo_carro: { sedan: 'Sedan', suv: 'SUV', pickup: 'Pickup', tres_filas: '3 filas', economico: 'Económico', abierto: 'Abierto a opciones', especifico: 'Vehículo específico' },
   placa: { nueva: 'Tablilla nueva', transferencia: 'Transferencia de placa', no_sabe: 'No sabe todavía' },
   estado: { nueva: 'Nueva', trabajando: 'Trabajándola', esperando: 'Esperando al cliente', cerrada: 'Cerrada' },
-  veredicto: { aprobado: 'Aprobada', posible: 'Con posibilidad', negado: 'Negada' }
+  // 'historial' no es un veredicto que alguien haya puesto: marca las que vinieron del
+  // formulario viejo del call center y nunca pasaron por Finance. Va aparte para que no
+  // aparezcan como pendientes ni ensucien el % de aprobación.
+  veredicto: { aprobado: 'Aprobada', posible: 'Con posibilidad', negado: 'Negada', historico: 'Historial' }
 };
 const et = (campo, v) => (ETIQUETAS[campo] && ETIQUETAS[campo][v]) || v || '';
 
