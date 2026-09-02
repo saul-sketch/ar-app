@@ -320,7 +320,14 @@ const sinTildes = t => String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g
 let LISTA_OK = false;
 async function cargarGente(){
   try{
-    const r = await fetch(`${SUPA_URL}/rest/v1/crm_roster?select=name&active=is.true&order=name.asc`,
+    /* Solo fuerza de ventas: activo en el CRM Y con equipo de ventas asignado.
+       Los managers y la gente de administración tienen usuario en el CRM pero no
+       llenan aplicaciones — si aparecieran en la lista, cualquiera podría mandar una
+       a nombre de ellos. Quien todavía no tiene rol asignado tampoco aparece: el rol
+       se pone en WaveDialer y desde ahí entra a esta lista en menos de 10 minutos. */
+    const EQUIPOS_VENTAS = 'call-center,closers-orlando,closers-kissimmee';
+    const r = await fetch(`${SUPA_URL}/rest/v1/crm_roster`
+              + `?select=name&active=is.true&team=in.(${EQUIPOS_VENTAS})&order=name.asc`,
                           { headers: SUPA_H, cache: 'no-store' });
     const d = await r.json();
     if (!Array.isArray(d) || !d.length) throw new Error('vacia');
@@ -344,7 +351,7 @@ function pintarSugerencias(){
   if (exacto){ caja.classList.remove('on'); return; }
   const hits = GENTE.filter(n => sinTildes(n).includes(q)).slice(0, 6);
   caja.innerHTML = hits.map(n => `<b onmousedown="elegirVend(this)">${n.replace(/</g,'&lt;')}</b>`).join('')
-    + (hits.length ? '' : '<i>No está en la lista del CRM. Elige tu nombre o pide que te creen el usuario.</i>');
+    + (hits.length ? '' : '<i>No apareces en la lista de vendedores. Pide que te den de alta antes de mandar la aplicación.</i>');
   caja.classList.add('on');
 }
 function elegirVend(el){
@@ -438,7 +445,7 @@ async function enviar(){
      no. Si la lista no cargó (LISTA_OK false) no se bloquea a nadie. */
   const inpV = document.getElementById('f_vend_nombre');
   if (LISTA_OK && !inpV.readOnly && val('f_vend_nombre') && !esDelCRM()){
-    falta.push('tu nombre tal como está en el CRM (elígelo de la lista)');
+    falta.push('tu nombre elegido de la lista de vendedores');
     inpV.classList.add('invalid');
     pintarSugerencias();
   }
