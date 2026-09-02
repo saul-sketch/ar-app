@@ -730,7 +730,7 @@ function fila(a){
             return `<span class="badge b-${c}" title="lleva esperando">⏱ ${t}</span>`; })() : ''}
         ${a.veredicto ? `<span class="badge b-${VER_COLOR[a.veredicto]}" title="${esc((a.veredicto_por||'') + (a.veredicto_at ? ' · ' + cuandoRelativo(a.veredicto_at) : ''))}">${esc(et('veredicto', a.veredicto))}</span>`
                       : '<span class="badge b-gris">Sin revisar</span>'}
-        <span class="badge b-${urg}">${esc(et('urgencia', a.urgencia))}</span>
+        ${a.urgencia ? `<span class="badge b-${urg}">${esc(et('urgencia', a.urgencia))}</span>` : ''}
         ${a.estado !== 'nueva' ? `<span class="badge b-azul">${esc(et('estado', a.estado))}</span>` : ''}
         ${(a.bitacora || []).filter(x=>(x.tipo!=='etapa'&&x.tipo!=='veredicto')).length ? `<span class="badge b-gris" title="notas de Finance">✎ ${(a.bitacora || []).filter(x=>(x.tipo!=='etapa'&&x.tipo!=='veredicto')).length}</span>` : ''}
         ${a.copia_estado && a.copia_estado !== 'enviada' ? `<span class="badge b-ambar" title="${esc(COPIA_MAL[a.copia_estado] || a.copia_estado)}">✉ no le llegó</span>` : ''}
