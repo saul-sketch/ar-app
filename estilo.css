@@ -86,3 +86,16 @@ textarea.field-input{min-height:88px;resize:vertical;line-height:1.5;}
 
 .vacio{text-align:center;padding:48px 20px;color:var(--gray-400);font-size:14px;}
 .cargando{text-align:center;padding:48px 20px;color:var(--gray-400);font-size:14px;}
+
+/* Lista de gente del CRM al escribir el nombre en la forma. Sin desplegable del
+   sistema: se ve igual en todos los teléfonos y no tapa el resto de la forma. */
+.sug{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:40;background:#fff;
+     border:1px solid var(--gray-200);border-radius:12px;box-shadow:0 12px 28px rgba(15,23,42,.13);
+     overflow:hidden;display:none}
+.sug.on{display:block}
+.sug b{display:block;padding:11px 13px;font-size:14px;font-weight:600;cursor:pointer;
+       border-bottom:1px solid var(--gray-100)}
+.sug b:last-child{border-bottom:0}
+.sug b:hover,.sug b.mk{background:var(--gray-100)}
+.sug i{display:block;padding:9px 13px;font-size:12px;color:var(--gray-500);font-style:normal;
+       background:var(--gray-50)}

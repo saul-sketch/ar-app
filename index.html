@@ -45,7 +45,10 @@
       <div class="field-grid grid-2">
         <div class="field">
           <div class="field-label">Tu nombre<span class="req">*</span></div>
-          <input class="field-input" id="f_vend_nombre" placeholder="Nombre y apellido" autocomplete="name">
+          <div style="position:relative">
+            <input class="field-input" id="f_vend_nombre" placeholder="Nombre y apellido" autocomplete="off" spellcheck="false">
+            <div id="sug_vend" class="sug"></div>
+          </div>
         </div>
         <div class="field">
           <div class="field-label">Tu email<span class="req">*</span></div>
@@ -300,6 +303,53 @@ document.getElementById('f_cli_tel').addEventListener('input', e => {
   });
 });
 
+/* La gente del CRM. El nombre se escribía a mano y por eso el mismo asesor
+   terminaba escrito de tres formas: "saul lozano", "Saul L", "SAUL LOZANO", y en los
+   tableros salía como tres personas distintas. Ahora al escribir aparecen los nombres
+   reales del CRM, y aunque escriba a su manera, al enviar se guarda con la escritura
+   del CRM. Se puede escribir un nombre que no esté en la lista (alguien nuevo), pero
+   deja de ser lo normal. */
+let GENTE = [];
+const sinTildes = t => String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+                        .replace(/[^\w\s]/g,'').toLowerCase().trim();
+
+async function cargarGente(){
+  try{
+    const r = await fetch(`${SUPA_URL}/rest/v1/crm_roster?select=name&active=is.true&order=name.asc`,
+                          { headers: SUPA_H });
+    const d = await r.json();
+    GENTE = Array.isArray(d) ? d.map(x => String(x.name||'').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu,'').trim()).filter(Boolean) : [];
+  }catch(e){ GENTE = []; }
+}
+
+function pintarSugerencias(){
+  const inp = document.getElementById('f_vend_nombre');
+  const caja = document.getElementById('sug_vend');
+  if (inp.readOnly || !GENTE.length){ caja.classList.remove('on'); return; }
+  const q = sinTildes(inp.value);
+  if (!q){ caja.classList.remove('on'); return; }
+  const exacto = GENTE.some(n => sinTildes(n) === q);
+  if (exacto){ caja.classList.remove('on'); return; }
+  const hits = GENTE.filter(n => sinTildes(n).includes(q)).slice(0, 6);
+  caja.innerHTML = hits.map(n => `<b onmousedown="elegirVend(this)">${n.replace(/</g,'&lt;')}</b>`).join('')
+    + (hits.length ? '' : '<i>No está en la lista — se guardará como lo escribiste</i>');
+  caja.classList.add('on');
+}
+function elegirVend(el){
+  document.getElementById('f_vend_nombre').value = el.textContent;
+  document.getElementById('sug_vend').classList.remove('on');
+}
+/* Última red: si lo que escribió es el mismo nombre del CRM salvo tildes, mayúsculas
+   o puntos, se guarda con la escritura del CRM. Así no se cuela un duplicado nuevo
+   aunque haya ignorado la lista. */
+function normalizarVend(){
+  const inp = document.getElementById('f_vend_nombre');
+  const q = sinTildes(inp.value);
+  if (!q) return;
+  const m = GENTE.find(n => sinTildes(n) === q);
+  if (m) inp.value = m;
+}
+
 // Nombre y email del vendedor: se recuerdan en este teléfono
 const RECUERDA = 'ar_oa_vendedor';
 (function(){
@@ -352,7 +402,18 @@ function marcarFalta(lista){
   document.getElementById('error-box').scrollIntoView({behavior:'smooth', block:'center'});
 }
 
+(function(){
+  const inp = document.getElementById('f_vend_nombre');
+  inp.addEventListener('input', pintarSugerencias);
+  inp.addEventListener('focus', pintarSugerencias);
+  inp.addEventListener('blur', () => setTimeout(() => {
+    document.getElementById('sug_vend').classList.remove('on'); normalizarVend();
+  }, 120));
+  cargarGente();
+})();
+
 async function enviar(){
+  normalizarVend();
   const falta = [];
   const req = [['f_vend_nombre','tu nombre'],['f_vend_email','tu email'],
                ['f_cli_nombre','nombre del cliente'],['f_cli_tel','teléfono del cliente'],
