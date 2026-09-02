@@ -313,13 +313,25 @@ let GENTE = [];
 const sinTildes = t => String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
                         .replace(/[^\w\s]/g,'').toLowerCase().trim();
 
+/* GENTE = null significa "no pude preguntar quién trabaja aquí". Es distinto de una
+   lista vacía: si no se pudo cargar NO se bloquea a nadie, porque dejar a todo el
+   equipo sin poder mandar una aplicación por una falla de red es peor que aceptar un
+   nombre escrito a mano. */
+let LISTA_OK = false;
 async function cargarGente(){
   try{
     const r = await fetch(`${SUPA_URL}/rest/v1/crm_roster?select=name&active=is.true&order=name.asc`,
-                          { headers: SUPA_H });
+                          { headers: SUPA_H, cache: 'no-store' });
     const d = await r.json();
-    GENTE = Array.isArray(d) ? d.map(x => String(x.name||'').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu,'').trim()).filter(Boolean) : [];
-  }catch(e){ GENTE = []; }
+    if (!Array.isArray(d) || !d.length) throw new Error('vacia');
+    GENTE = d.map(x => String(x.name||'').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu,'').trim()).filter(Boolean);
+    LISTA_OK = GENTE.length > 0;
+  }catch(e){ GENTE = []; LISTA_OK = false; }
+}
+// ¿El nombre escrito es alguien que trabaja aquí hoy?
+function esDelCRM(){
+  const q = sinTildes(document.getElementById('f_vend_nombre').value);
+  return !!q && GENTE.some(n => sinTildes(n) === q);
 }
 
 function pintarSugerencias(){
@@ -332,7 +344,7 @@ function pintarSugerencias(){
   if (exacto){ caja.classList.remove('on'); return; }
   const hits = GENTE.filter(n => sinTildes(n).includes(q)).slice(0, 6);
   caja.innerHTML = hits.map(n => `<b onmousedown="elegirVend(this)">${n.replace(/</g,'&lt;')}</b>`).join('')
-    + (hits.length ? '' : '<i>No está en la lista — se guardará como lo escribiste</i>');
+    + (hits.length ? '' : '<i>No está en la lista del CRM. Elige tu nombre o pide que te creen el usuario.</i>');
   caja.classList.add('on');
 }
 function elegirVend(el){
@@ -421,6 +433,15 @@ async function enviar(){
   document.querySelectorAll('.field-input').forEach(i => i.classList.remove('invalid'));
   document.querySelectorAll('.opts').forEach(o => o.classList.remove('invalid'));
   req.forEach(([id,lbl]) => { if(!val(id)){ falta.push(lbl); document.getElementById(id).classList.add('invalid'); } });
+  /* El nombre tiene que ser el de un usuario del CRM. La lista se refresca sola cada
+     10 minutos: a quien le crearon usuario hoy ya puede, y a quien se lo quitaron ya
+     no. Si la lista no cargó (LISTA_OK false) no se bloquea a nadie. */
+  const inpV = document.getElementById('f_vend_nombre');
+  if (LISTA_OK && !inpV.readOnly && val('f_vend_nombre') && !esDelCRM()){
+    falta.push('tu nombre tal como está en el CRM (elígelo de la lista)');
+    inpV.classList.add('invalid');
+    pintarSugerencias();
+  }
   const email = val('f_vend_email').toLowerCase();   // un correo es el mismo en mayúsculas o minúsculas
   if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ falta.push('tu email no se ve válido'); document.getElementById('f_vend_email').classList.add('invalid'); }
   if (val('f_cli_tel').replace(/\D/g,'').length !== 10){ falta.push('teléfono completo (10 dígitos)'); document.getElementById('f_cli_tel').classList.add('invalid'); }
