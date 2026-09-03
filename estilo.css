@@ -99,3 +99,9 @@ textarea.field-input{min-height:88px;resize:vertical;line-height:1.5;}
 .sug b:hover,.sug b.mk{background:var(--gray-100)}
 .sug i{display:block;padding:9px 13px;font-size:12px;color:var(--gray-500);font-style:normal;
        background:var(--gray-50)}
+
+/* Los dos FICO (signer y co-signer) con su etiqueta encima del campo, para que no
+   haya que adivinar cuál es cuál cuando los dos tienen número. */
+.ficolbl{display:inline-flex;flex-direction:column;gap:2px;font-size:10px;
+         color:var(--gray-500);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+.ficolbl .field-input{max-width:96px;text-transform:none;letter-spacing:0}

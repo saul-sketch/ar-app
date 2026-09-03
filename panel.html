@@ -325,7 +325,7 @@ function ocupado(){
    refrescos no traen nada nuevo, y no redibujar es la unica forma segura de no
    moverle nada a quien esta trabajando. */
 function huella(filas){
-  return filas.map(a => [a.id, a.estado, a.veredicto, a.deal_number, a.fico,
+  return filas.map(a => [a.id, a.estado, a.veredicto, a.deal_number, a.fico, a.fico_co,
     (a.bitacora||[]).length, a.copia_estado, a.crm_contact_id].join('~')).join('|');
 }
 
@@ -525,6 +525,11 @@ function vieneHoy(a){
 function horasEsperando(a){ return (Date.now() - new Date(a.created_at)) / 36e5; }
 
 let FICO = 'todas', FICO_MIN = null, FICO_MAX = null;
+// El puntaje que manda para filtrar: el más alto entre signer y co-signer.
+function mejorFico(a){
+  const v = [a.fico, a.fico_co].filter(x => x != null).map(Number);
+  return v.length ? Math.max(...v) : null;
+}
 function visibles(){
   const q = BUSCA.toLowerCase().trim();
   return deLaTienda().filter(a => {
@@ -537,12 +542,16 @@ function visibles(){
     if (FILTRO === 'sincopia' && !(a.copia_estado && a.copia_estado !== 'enviada')) return false;
     // FICO: los botones son "de tanto para arriba"; los dos recuadros, un rango.
     // "Sin revisar" son las que nadie ha mirado todavía — no las de puntaje bajo.
-    if (FICO === 'sin' && a.fico != null) return false;
+    // Se filtra por el MEJOR de los dos puntajes: si el co-signer tiene 700 y el
+    // signer 540, esa aplicación sí califica para "700+", que es lo que uno busca
+    // al preguntarse cuáles pueden aprobar.
+    const fmax = mejorFico(a);
+    if (FICO === 'sin' && fmax != null) return false;
     if (FICO !== 'todas' && FICO !== 'sin'){
-      if (a.fico == null || a.fico < Number(FICO)) return false;
+      if (fmax == null || fmax < Number(FICO)) return false;
     }
-    if (FICO_MIN != null && (a.fico == null || a.fico < FICO_MIN)) return false;
-    if (FICO_MAX != null && (a.fico == null || a.fico > FICO_MAX)) return false;
+    if (FICO_MIN != null && (fmax == null || fmax < FICO_MIN)) return false;
+    if (FICO_MAX != null && (fmax == null || fmax > FICO_MAX)) return false;
     if (!q) return true;
     return [a.cliente_nombre, a.cliente_telefono, a.vendedor_nombre, a.vehiculo_especifico, a.notas, a.deal_number]
       .some(x => String(x || '').toLowerCase().includes(q));
@@ -797,9 +806,12 @@ function fila(a){
       </div>
       <div class="dealbox">
         <span class="k">FICO</span>
-        <input class="field-input" id="fico-${a.id}" value="${a.fico != null ? a.fico : ''}" inputmode="numeric"
-               style="max-width:110px" placeholder="ej. 620"
-               onkeydown="if(event.key==='Enter')guardarFico('${a.id}')">
+        <label class="ficolbl">signer
+          <input class="field-input" id="fico-${a.id}" value="${a.fico != null ? a.fico : ''}" inputmode="numeric"
+                 placeholder="ej. 620" onkeydown="if(event.key==='Enter')guardarFico('${a.id}')"></label>
+        <label class="ficolbl">co-signer
+          <input class="field-input" id="ficoco-${a.id}" value="${a.fico_co != null ? a.fico_co : ''}" inputmode="numeric"
+                 placeholder="si hay" onkeydown="if(event.key==='Enter')guardarFico('${a.id}')"></label>
         <button class="btn btn-ghost" onclick="guardarFico('${a.id}')">Guardar</button>
         ${a.fico_por ? `<span class="quien">lo puso <b>${esc(a.fico_por)}</b>${a.fico_at ? ' · ' + esc(cuandoRelativo(a.fico_at)) : ''}</span>` : ''}
         <span class="fico-ok"></span>
@@ -1028,27 +1040,32 @@ async function guardarDeal(id){
    nombre y la hora, igual que el veredicto: sirve para filtrar después y para saber
    quién lo consultó. Vacío = todavía no lo han mirado. */
 async function guardarFico(id){
-  const inp = document.getElementById('fico-' + id);
-  const txt = (inp.value || '').trim();
   const a = TODAS.find(x => x.id === id);
-  const antes = a.fico;
-  const v = txt === '' ? null : parseInt(txt, 10);
-  if (v !== null && (!Number.isFinite(v) || v < 300 || v > 900)){
-    inp.classList.add('invalid');
-    alert('El FICO va de 300 a 900.');
-    return;
-  }
-  inp.classList.remove('invalid');
-  if (v === antes) return;
-  a.fico = v; a.fico_por = v === null ? null : QUIEN; a.fico_at = v === null ? null : new Date().toISOString();
+  const leer = (pre) => {
+    const inp = document.getElementById(pre + '-' + id);
+    const txt = (inp.value || '').trim();
+    if (txt === '') { inp.classList.remove('invalid'); return { ok: true, v: null }; }
+    const n = parseInt(txt, 10);
+    if (!Number.isFinite(n) || n < 300 || n > 900){ inp.classList.add('invalid'); return { ok: false }; }
+    inp.classList.remove('invalid');
+    return { ok: true, v: n };
+  };
+  const s = leer('fico'), c = leer('ficoco');
+  if (!s.ok || !c.ok) { alert('El FICO va de 300 a 900.'); return; }
+  const antes = { f: a.fico, fc: a.fico_co, por: a.fico_por, at: a.fico_at };
+  if (s.v === antes.f && c.v === antes.fc) return;
+  const hay = s.v !== null || c.v !== null;
+  a.fico = s.v; a.fico_co = c.v;
+  a.fico_por = hay ? QUIEN : null;
+  a.fico_at  = hay ? new Date().toISOString() : null;
   pintar();
   try{
-    const r = await rpc('ar_oa_fico', { p_codigo: CODIGO, p_id: id, p_fico: v });
+    const r = await rpc('ar_oa_fico', { p_codigo: CODIGO, p_id: id, p_fico: s.v, p_fico_co: c.v });
     if (!Array.isArray(r) || !r.length) throw new Error('no se guardó');
-    const c = document.querySelector('.fico-ok');
-    if (c) { c.textContent = v === null ? 'Quitado ✓' : 'Guardado ✓'; setTimeout(() => { if (c.isConnected) c.textContent = ''; }, 2200); }
+    const el = document.querySelector('.fico-ok');
+    if (el) { el.textContent = hay ? 'Guardado ✓' : 'Quitado ✓'; setTimeout(() => { if (el.isConnected) el.textContent = ''; }, 2200); }
   }catch(e){
-    a.fico = antes; pintar();
+    a.fico = antes.f; a.fico_co = antes.fc; a.fico_por = antes.por; a.fico_at = antes.at; pintar();
     alert('No se pudo guardar el FICO. Revisa el internet.');
   }
 }
