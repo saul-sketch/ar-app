@@ -219,6 +219,18 @@
       <button class="chip" data-f="cerrada">Cerradas</button>
       <button class="chip" data-f="sincopia">Sin copia ✉</button>
     </div>
+    <div class="filtros" style="margin-bottom:8px">
+      <span class="ftit">FICO</span>
+      <button class="chip on" data-fi="todas">Todos</button>
+      <button class="chip" data-fi="sin">Sin revisar</button>
+      <button class="chip" data-fi="700">700+</button>
+      <button class="chip" data-fi="650">650+</button>
+      <button class="chip" data-fi="600">600+</button>
+      <button class="chip" data-fi="550">550+</button>
+      <span class="ftit" style="margin-left:6px">o entre</span>
+      <input class="field-input" id="fico-min" inputmode="numeric" placeholder="min" style="max-width:74px">
+      <input class="field-input" id="fico-max" inputmode="numeric" placeholder="max" style="max-width:74px">
+    </div>
     <div class="filtros">
       <input class="field-input" id="buscar" placeholder="Buscar por cliente, teléfono, Deal # o vendedor...">
       <button class="chip" onclick="limpiarFiltros()" id="chip-limpiar" style="display:none;color:var(--gray-500)">Quitar filtros</button>
@@ -313,7 +325,7 @@ function ocupado(){
    refrescos no traen nada nuevo, y no redibujar es la unica forma segura de no
    moverle nada a quien esta trabajando. */
 function huella(filas){
-  return filas.map(a => [a.id, a.estado, a.veredicto, a.deal_number,
+  return filas.map(a => [a.id, a.estado, a.veredicto, a.deal_number, a.fico,
     (a.bitacora||[]).length, a.copia_estado, a.crm_contact_id].join('~')).join('|');
 }
 
@@ -512,6 +524,7 @@ function vieneHoy(a){
 }
 function horasEsperando(a){ return (Date.now() - new Date(a.created_at)) / 36e5; }
 
+let FICO = 'todas', FICO_MIN = null, FICO_MAX = null;
 function visibles(){
   const q = BUSCA.toLowerCase().trim();
   return deLaTienda().filter(a => {
@@ -522,6 +535,14 @@ function visibles(){
     if (FILTRO === 'hoy' && !(a.urgencia === 'hoy' || a.urgencia === '2-3dias')) return false;
     if (['trabajando','esperando','cerrada'].includes(FILTRO) && a.estado !== FILTRO) return false;
     if (FILTRO === 'sincopia' && !(a.copia_estado && a.copia_estado !== 'enviada')) return false;
+    // FICO: los botones son "de tanto para arriba"; los dos recuadros, un rango.
+    // "Sin revisar" son las que nadie ha mirado todavía — no las de puntaje bajo.
+    if (FICO === 'sin' && a.fico != null) return false;
+    if (FICO !== 'todas' && FICO !== 'sin'){
+      if (a.fico == null || a.fico < Number(FICO)) return false;
+    }
+    if (FICO_MIN != null && (a.fico == null || a.fico < FICO_MIN)) return false;
+    if (FICO_MAX != null && (a.fico == null || a.fico > FICO_MAX)) return false;
     if (!q) return true;
     return [a.cliente_nombre, a.cliente_telefono, a.vendedor_nombre, a.vehiculo_especifico, a.notas, a.deal_number]
       .some(x => String(x || '').toLowerCase().includes(q));
@@ -676,7 +697,8 @@ function pintar(){
   const urgentes = base.filter(a => a.urgencia === 'hoy' || a.urgencia === '2-3dias').length;
   const sinRevisar = base.filter(a => !a.veredicto).length;
   const cl = document.getElementById('chip-limpiar');
-  if (cl) cl.style.display = (VER !== 'todas' || FILTRO !== 'todas' || LOC !== 'todas' || VEND !== 'todos' || BUSCA || SOLO_HOY) ? '' : 'none';
+  if (cl) cl.style.display = (VER !== 'todas' || FILTRO !== 'todas' || LOC !== 'todas' || VEND !== 'todos' || BUSCA || SOLO_HOY
+                              || FICO !== 'todas' || FICO_MIN != null || FICO_MAX != null) ? '' : 'none';
   document.getElementById('kpis').innerHTML =
     `<div class="kpi"><div class="n">${base.length}</div><div class="l">${LOC === 'todas' ? 'En total' : (LOC === 'sin' ? 'Sin tienda' : esc(LOC))}</div></div>
      <div class="kpi"><div class="n">${deHoy}</div><div class="l">Entraron hoy</div></div>
@@ -772,6 +794,15 @@ function fila(a){
         ${['aprobado','posible','negado'].map(v =>
           `<button class="vbtn ${a.veredicto===v?'on '+VER_COLOR[v]:''}" onclick="veredicto('${a.id}','${a.veredicto===v?'':v}')">${esc(et('veredicto', v))}</button>`).join('')}
         ${a.veredicto_por ? `<span class="quien">revisada por <b>${esc(a.veredicto_por)}</b> · ${esc(cuandoRelativo(a.veredicto_at))}</span>` : ''}
+      </div>
+      <div class="dealbox">
+        <span class="k">FICO</span>
+        <input class="field-input" id="fico-${a.id}" value="${a.fico != null ? a.fico : ''}" inputmode="numeric"
+               style="max-width:110px" placeholder="ej. 620"
+               onkeydown="if(event.key==='Enter')guardarFico('${a.id}')">
+        <button class="btn btn-ghost" onclick="guardarFico('${a.id}')">Guardar</button>
+        ${a.fico_por ? `<span class="quien">lo puso <b>${esc(a.fico_por)}</b>${a.fico_at ? ' · ' + esc(cuandoRelativo(a.fico_at)) : ''}</span>` : ''}
+        <span class="fico-ok"></span>
       </div>
       <div class="dealbox">
         <span class="k">Deal #</span>
@@ -993,6 +1024,35 @@ async function guardarDeal(id){
   }
 }
 
+/* El puntaje de crédito lo escribe quien revisa la aplicación. Se guarda con su
+   nombre y la hora, igual que el veredicto: sirve para filtrar después y para saber
+   quién lo consultó. Vacío = todavía no lo han mirado. */
+async function guardarFico(id){
+  const inp = document.getElementById('fico-' + id);
+  const txt = (inp.value || '').trim();
+  const a = TODAS.find(x => x.id === id);
+  const antes = a.fico;
+  const v = txt === '' ? null : parseInt(txt, 10);
+  if (v !== null && (!Number.isFinite(v) || v < 300 || v > 900)){
+    inp.classList.add('invalid');
+    alert('El FICO va de 300 a 900.');
+    return;
+  }
+  inp.classList.remove('invalid');
+  if (v === antes) return;
+  a.fico = v; a.fico_por = v === null ? null : QUIEN; a.fico_at = v === null ? null : new Date().toISOString();
+  pintar();
+  try{
+    const r = await rpc('ar_oa_fico', { p_codigo: CODIGO, p_id: id, p_fico: v });
+    if (!Array.isArray(r) || !r.length) throw new Error('no se guardó');
+    const c = document.querySelector('.fico-ok');
+    if (c) { c.textContent = v === null ? 'Quitado ✓' : 'Guardado ✓'; setTimeout(() => { if (c.isConnected) c.textContent = ''; }, 2200); }
+  }catch(e){
+    a.fico = antes; pintar();
+    alert('No se pudo guardar el FICO. Revisa el internet.');
+  }
+}
+
 function abrir(id){ ABIERTA = ABIERTA === id ? null : id; pintar(); }
 function copiar(id, btn){
   const url = linkPublico(id);
@@ -1016,11 +1076,38 @@ document.querySelectorAll('.chip[data-v]').forEach(c => c.onclick = () => {
   document.querySelectorAll('.chip[data-v]').forEach(x => x.classList.remove('on'));
   c.classList.add('on'); VER = c.dataset.v; ABIERTA = null; pintar();
 });
+// Los botones de FICO y el rango son lo mismo visto de dos formas: usar uno apaga
+// el otro, para que nunca queden dos reglas peleando sin que se vea cuál manda.
+document.querySelectorAll('.chip[data-fi]').forEach(c => c.onclick = () => {
+  document.querySelectorAll('.chip[data-fi]').forEach(x => x.classList.remove('on'));
+  c.classList.add('on'); FICO = c.dataset.fi;
+  FICO_MIN = FICO_MAX = null;
+  document.getElementById('fico-min').value = '';
+  document.getElementById('fico-max').value = '';
+  ABIERTA = null; pintar();
+});
+['fico-min','fico-max'].forEach(id => {
+  document.getElementById(id).addEventListener('input', e => {
+    const v = (e.target.value || '').trim();
+    const n = v === '' ? null : parseInt(v, 10);
+    const val = (n !== null && Number.isFinite(n)) ? n : null;
+    if (id === 'fico-min') FICO_MIN = val; else FICO_MAX = val;
+    if (FICO_MIN != null || FICO_MAX != null){
+      FICO = 'todas';
+      document.querySelectorAll('.chip[data-fi]').forEach(x => x.classList.toggle('on', x.dataset.fi === 'todas'));
+    }
+    ABIERTA = null; pintar();
+  });
+});
 function limpiarFiltros(){
   VER = 'todas'; FILTRO = 'todas'; LOC = 'todas'; VEND = 'todos'; BUSCA = ''; SOLO_HOY = false;
+  FICO = 'todas'; FICO_MIN = null; FICO_MAX = null;
   document.getElementById('buscar').value = '';
+  document.getElementById('fico-min').value = '';
+  document.getElementById('fico-max').value = '';
   document.querySelectorAll('.chip[data-v]').forEach(x => x.classList.toggle('on', x.dataset.v === 'todas'));
   document.querySelectorAll('.chip[data-f]').forEach(x => x.classList.toggle('on', x.dataset.f === 'todas'));
+  document.querySelectorAll('.chip[data-fi]').forEach(x => x.classList.toggle('on', x.dataset.fi === 'todas'));
   ABIERTA = null; pintar();
 }
 /* Al abrir: si viene del menú del CRM, el propio CRM ya dice quién es.
