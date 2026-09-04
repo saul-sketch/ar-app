@@ -30,8 +30,40 @@
   .kpi .l{font-size:11px;color:var(--gray-500);text-transform:uppercase;letter-spacing:.6px;margin-top:6px;font-weight:700;}
   .filtros{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
   .filtros .field-input{max-width:260px;}
-  .chip{padding:8px 14px;border-radius:999px;border:1.5px solid var(--gray-200);background:var(--gray-100);color:var(--gray-700);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;min-height:40px;}
+  /* Los botones apagados van SIN borde: son 17 en pantalla y cada borde era una línea
+     más compitiendo por atención. Peso visual solo para el que está puesto. */
+  .chip{padding:8px 14px;border-radius:999px;border:1.5px solid transparent;background:var(--gray-100);color:var(--gray-600);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;min-height:38px;transition:background .12s,color .12s;}
+  .chip:hover{background:var(--gray-200);color:var(--gray-900);}
   .chip.on{background:var(--primary);border-color:var(--primary);color:#fff;}
+  .chip.on:hover{background:var(--gray-800);color:#fff;}
+
+  /* Buscar: primero y a todo el ancho. */
+  .buscador{position:relative;display:flex;align-items:center;gap:8px;margin-bottom:12px;}
+  .buscador svg{position:absolute;left:13px;width:17px;height:17px;fill:none;stroke:var(--gray-400);stroke-width:2;stroke-linecap:round;pointer-events:none;}
+  .buscador input{flex:1;min-width:0;padding:12px 14px 12px 38px;border:1.5px solid var(--gray-200);border-radius:11px;
+                  font-size:14px;font-family:inherit;background:#fff;color:var(--gray-900);min-height:44px;transition:border-color .15s,box-shadow .15s;}
+  .buscador input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(59,130,246,.12);}
+  .buscador input::placeholder{color:var(--gray-400);}
+  .buscador button{flex:none;padding:0 14px;height:44px;border-radius:11px;border:1.5px solid var(--gray-200);
+                   background:#fff;color:var(--gray-500);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;}
+  .buscador button:hover{border-color:var(--gray-300);color:var(--gray-900);}
+
+  /* Los filtros como UN bloque, no como tres filas sueltas flotando. */
+  .fbox{background:var(--gray-50);border:1px solid var(--gray-200);border-radius:14px;padding:6px 14px;margin-bottom:16px;}
+  .frow{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--gray-200);}
+  .frow:last-child{border-bottom:0;}
+  .frow .ftit{flex:none;width:74px;padding-top:11px;margin:0;text-align:right;}
+  .fchips{display:flex;flex-wrap:wrap;gap:7px;flex:1;min-width:0;align-items:center;}
+
+  /* El rango como un solo control: dos recuadros sueltos se leían como dos filtros. */
+  .rango{display:inline-flex;align-items:center;gap:2px;margin-left:6px;padding:0 8px;height:38px;
+         background:#fff;border:1.5px solid var(--gray-200);border-radius:999px;}
+  .rango input{width:46px;border:0;background:transparent;font-family:inherit;font-size:13px;font-weight:600;
+               color:var(--gray-900);text-align:center;padding:0;min-height:0;}
+  .rango input:focus{outline:none;}
+  .rango input::placeholder{color:var(--gray-400);font-weight:500;}
+  .rango i{color:var(--gray-400);font-style:normal;font-size:13px;}
+  .rango:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px rgba(59,130,246,.12);}
   .fila{background:#fff;border:1.5px solid var(--gray-200);border-radius:12px;padding:14px;margin-bottom:9px;cursor:pointer;transition:all .15s;}
   .fila:hover{border-color:var(--gray-300);box-shadow:var(--shadow);}
   .fila .top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap;}
@@ -84,6 +116,11 @@
     #filtros-caja{display:none;}
     #filtros-caja.abierta{display:block;}
     .kpis{grid-template-columns:repeat(2,1fr);}
+    /* En pantalla chica la columna de etiquetas robaba el ancho de los botones:
+       pasa arriba de cada grupo. */
+    .frow{flex-direction:column;gap:7px;}
+    .frow .ftit{width:auto;text-align:left;padding-top:0;}
+    .fbox{padding:4px 12px;}
   }
   .kpi-sub{font-size:11px;color:var(--gray-400);margin-top:5px;font-weight:600;}
   .sect2{margin-top:26px;}
@@ -202,39 +239,55 @@
          ven en la tarjeta y los botones de filtrar dicen ahora exactamente lo mismo. -->
     <button class="filtros-tog" onclick="const c=document.getElementById('filtros-caja');c.classList.toggle('abierta');this.textContent=(c.classList.contains('abierta')?'▴ Ocultar filtros':'▾ Filtros y búsqueda')">▾ Filtros y búsqueda</button>
     <div id="filtros-caja">
-    <div class="filtros" style="margin-bottom:8px">
-      <span class="ftit">Veredicto</span>
-      <button class="chip on" data-v="todas">Todas</button>
-      <button class="chip" data-v="sinrevisar">Sin revisar</button>
-      <button class="chip" data-v="aprobado">Aprobadas</button>
-      <button class="chip" data-v="posible">Con posibilidad</button>
-      <button class="chip" data-v="negado">Negadas</button>
-    </div>
-    <div class="filtros" style="margin-bottom:8px">
-      <span class="ftit">Etapa</span>
-      <button class="chip on" data-f="todas">Todas</button>
-      <button class="chip" data-f="hoy">Compran ya</button>
-      <button class="chip" data-f="trabajando">Trabajándolas</button>
-      <button class="chip" data-f="esperando">Esperando</button>
-      <button class="chip" data-f="cerrada">Cerradas</button>
-      <button class="chip" data-f="sincopia">Sin copia ✉</button>
-    </div>
-    <div class="filtros" style="margin-bottom:8px">
-      <span class="ftit">FICO</span>
-      <button class="chip on" data-fi="todas">Todos</button>
-      <button class="chip" data-fi="sin">Sin revisar</button>
-      <button class="chip" data-fi="700">700+</button>
-      <button class="chip" data-fi="650">650+</button>
-      <button class="chip" data-fi="600">600+</button>
-      <button class="chip" data-fi="550">550+</button>
-      <span class="ftit" style="margin-left:6px">o entre</span>
-      <input class="field-input" id="fico-min" inputmode="numeric" placeholder="min" style="max-width:74px">
-      <input class="field-input" id="fico-max" inputmode="numeric" placeholder="max" style="max-width:74px">
-    </div>
-    <div class="filtros">
-      <input class="field-input" id="buscar" placeholder="Buscar por cliente, teléfono, Deal # o vendedor...">
-      <button class="chip" onclick="limpiarFiltros()" id="chip-limpiar" style="display:none;color:var(--gray-500)">Quitar filtros</button>
-    </div>
+      <!-- Buscar va primero y ocupa el ancho: cuando uno sabe a quién busca, es el
+           camino más corto. Los filtros son para explorar; la búsqueda para llegar. -->
+      <div class="buscador">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="buscar" placeholder="Buscar por cliente, teléfono, Deal # o vendedor…">
+        <button id="chip-limpiar" onclick="limpiarFiltros()" style="display:none">Quitar filtros</button>
+      </div>
+      <!-- Cada fila filtra UNA cosa y las tres se cruzan. La etiqueta va en una columna
+           de ancho fijo para que todos los botones arranquen en la misma línea: sin eso
+           las filas quedaban desalineadas y el bloque se leía como un amontonamiento. -->
+      <div class="fbox">
+        <div class="frow">
+          <span class="ftit">Veredicto</span>
+          <div class="fchips">
+            <button class="chip on" data-v="todas">Todas</button>
+            <button class="chip" data-v="sinrevisar">Sin revisar</button>
+            <button class="chip" data-v="aprobado">Aprobadas</button>
+            <button class="chip" data-v="posible">Con posibilidad</button>
+            <button class="chip" data-v="negado">Negadas</button>
+          </div>
+        </div>
+        <div class="frow">
+          <span class="ftit">Etapa</span>
+          <div class="fchips">
+            <button class="chip on" data-f="todas">Todas</button>
+            <button class="chip" data-f="hoy">Compran ya</button>
+            <button class="chip" data-f="trabajando">Trabajándolas</button>
+            <button class="chip" data-f="esperando">Esperando</button>
+            <button class="chip" data-f="cerrada">Cerradas</button>
+            <button class="chip" data-f="sincopia">Sin copia ✉</button>
+          </div>
+        </div>
+        <div class="frow">
+          <span class="ftit">FICO</span>
+          <div class="fchips">
+            <button class="chip on" data-fi="todas">Todos</button>
+            <button class="chip" data-fi="sin">Sin revisar</button>
+            <button class="chip" data-fi="700">700+</button>
+            <button class="chip" data-fi="650">650+</button>
+            <button class="chip" data-fi="600">600+</button>
+            <button class="chip" data-fi="550">550+</button>
+            <span class="rango">
+              <input id="fico-min" inputmode="numeric" placeholder="min">
+              <i>–</i>
+              <input id="fico-max" inputmode="numeric" placeholder="max">
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
     <div id="lista"><div class="cargando">Cargando…</div></div>
     <div id="kpi-vista" style="display:none"></div>
@@ -580,7 +633,9 @@ function verKpis(){
   document.getElementById('chip-kpis').classList.toggle('on', KPI_ON);
   document.getElementById('kpi-vista').style.display = KPI_ON ? '' : 'none';
   ['lista','kpis'].forEach(id => { const e = document.getElementById(id); if (e) e.style.display = KPI_ON ? 'none' : ''; });
-  document.querySelectorAll('.filtros').forEach((f,i) => { if (i > 0) f.style.display = KPI_ON ? 'none' : ''; });
+  // Los filtros y el buscador son de la lista: en la vista de KPIs no pintan nada.
+  ['filtros-caja'].forEach(id => { const e = document.getElementById(id); if (e) e.style.display = KPI_ON ? 'none' : ''; });
+  document.querySelectorAll('.filtros-tog').forEach(b => { b.style.display = KPI_ON ? 'none' : ''; });
   pintar();
 }
 
@@ -684,6 +739,43 @@ function pintarKpis(){
     </div>
 
     <div class="sect2">
+      <h3>Crédito</h3>
+      ${(() => {
+        const con = base.filter(x => mejorFico(x) != null);
+        if (!con.length) return `<div class="kpi-hint">Todavía nadie ha anotado un FICO. En cuanto Finance empiece a ponerlos, aquí sale si el puntaje predice la aprobación.</div>`;
+        const prom = Math.round(con.reduce((t,x) => t + mejorFico(x), 0) / con.length);
+        const conCo = con.filter(x => x.fico_co != null).length;
+        /* Lo que importa no es el promedio sino si el puntaje separa aprobadas de
+           negadas. Por eso cada banda muestra su tasa: si 700+ aprueba 80% y 550
+           aprueba 20%, el FICO sirve para priorizar; si dan parecido, no. */
+        const bandas = [['700 o más', x=>x>=700, 'var(--green)'], ['650–699', x=>x>=650&&x<700, '#22c55e'],
+                        ['600–649', x=>x>=600&&x<650, 'var(--yellow)'], ['550–599', x=>x>=550&&x<600, '#f97316'],
+                        ['menos de 550', x=>x<550, 'var(--red)']];
+        return `
+        <div class="kpi-hint">
+          <b>${con.length}</b> de ${base.length} tienen puntaje · faltan <b>${base.length - con.length}</b> ·
+          promedio <b>${prom}</b>${conCo ? ` · <b>${conCo}</b> con co-signer` : ''}
+        </div>
+        <div class="tabla-scroll"><table class="tabla">
+          <thead><tr><th>Puntaje</th><th>Cuántas</th><th>Aprobadas</th><th>Negadas</th><th>Tasa</th></tr></thead>
+          <tbody>${bandas.map(([t,f,c]) => {
+            const g = con.filter(x => f(mejorFico(x)));
+            if (!g.length) return '';
+            const ap = g.filter(x => x.veredicto === 'aprobado').length;
+            const ne = g.filter(x => x.veredicto === 'negado').length;
+            const rev = ap + ne;
+            return `<tr>
+              <td class="nom2"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c};margin-right:7px"></span>${t}</td>
+              <td><b>${g.length}</b></td>
+              <td style="color:${ap?'var(--green)':'var(--gray-300)'}">${ap||'—'}</td>
+              <td style="color:${ne?'var(--red)':'var(--gray-300)'}">${ne||'—'}</td>
+              <td>${rev ? Math.round(ap/rev*100)+'%' : '—'}</td></tr>`;
+          }).join('')}</tbody>
+        </table></div>`;
+      })()}
+    </div>
+
+    <div class="sect2">
       <h3>Por tienda</h3>
       <div class="tabla-scroll"><table class="tabla">
         <thead><tr><th>Tienda</th><th>${esc(etq)}</th><th>Total</th><th>Sin revisar</th></tr></thead>
@@ -706,8 +798,13 @@ function pintar(){
   const urgentes = base.filter(a => a.urgencia === 'hoy' || a.urgencia === '2-3dias').length;
   const sinRevisar = base.filter(a => !a.veredicto).length;
   const cl = document.getElementById('chip-limpiar');
-  if (cl) cl.style.display = (VER !== 'todas' || FILTRO !== 'todas' || LOC !== 'todas' || VEND !== 'todos' || BUSCA || SOLO_HOY
-                              || FICO !== 'todas' || FICO_MIN != null || FICO_MAX != null) ? '' : 'none';
+  // Cuántos filtros hay puestos. Sin el número uno no sabe por qué ve tan poco.
+  const nFiltros = [VER !== 'todas', FILTRO !== 'todas', LOC !== 'todas', VEND !== 'todos',
+                    !!BUSCA, SOLO_HOY, FICO !== 'todas', FICO_MIN != null || FICO_MAX != null].filter(Boolean).length;
+  if (cl){
+    cl.style.display = nFiltros ? '' : 'none';
+    cl.textContent = nFiltros === 1 ? 'Quitar filtro' : `Quitar ${nFiltros} filtros`;
+  }
   document.getElementById('kpis').innerHTML =
     `<div class="kpi"><div class="n">${base.length}</div><div class="l">${LOC === 'todas' ? 'En total' : (LOC === 'sin' ? 'Sin tienda' : esc(LOC))}</div></div>
      <div class="kpi"><div class="n">${deHoy}</div><div class="l">Entraron hoy</div></div>
