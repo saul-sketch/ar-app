@@ -379,7 +379,7 @@ function ocupado(){
    refrescos no traen nada nuevo, y no redibujar es la unica forma segura de no
    moverle nada a quien esta trabajando. */
 function huella(filas){
-  return filas.map(a => [a.id, a.estado, a.veredicto, a.deal_number, a.fico, a.fico_co, a.fico_txt, a.fico_co_txt,
+  return filas.map(a => [a.id, a.estado, a.veredicto, a.deal_number, a.fico, a.fico_co, a.fico_txt, a.fico_co_txt, (a.docs||[]).length,
     (a.bitacora||[]).length, a.copia_estado, a.crm_contact_id].join('~')).join('|');
 }
 
@@ -924,6 +924,19 @@ function fila(a){
         ${a.fico_por ? `<span class="quien">lo puso <b>${esc(a.fico_por)}</b>${a.fico_at ? ' · ' + esc(cuandoRelativo(a.fico_at)) : ''}</span>` : ''}
         <span class="fico-ok"></span>
       </div>
+      <div class="docbox" id="docs-${a.id}">
+        <span class="k">Documentos</span>
+        ${(a.docs || []).length ? (a.docs || []).map(d => `
+          <span class="doc">
+            <button class="doc-n" onclick="verDoc('${a.id}','${esc(d.ruta)}', this)" title="Abrir">${esc(d.nombre)}</button>
+            <span class="doc-p">${pesoArchivo(d.bytes)}${d.quien ? ' · ' + esc(d.quien) : ''}</span>
+            <button class="doc-x" onclick="borrarDoc('${a.id}','${esc(d.id)}','${esc(d.ruta)}')" title="Quitar">✕</button>
+          </span>`).join('') : '<span class="doc-vacio">todavía no hay</span>'}
+        <label class="btn btn-ghost doc-add">+ Subir
+          <input type="file" multiple style="display:none" onchange="subirDocs('${a.id}', this)">
+        </label>
+        <span class="doc-ok"></span>
+      </div>
       <div class="dealbox">
         <span class="k">Deal #</span>
         <input class="field-input" id="deal-${a.id}" value="${esc(a.deal_number || '')}" inputmode="numeric"
@@ -1191,6 +1204,85 @@ async function guardarFico(id){
     a.fico_por = antes.por; a.fico_at = antes.at; pintar();
     alert('No se pudo guardar el FICO. Revisa el internet.');
   }
+}
+
+/* ── Documentos del cliente ───────────────────────────────────────────────────
+   Los archivos viven en un guardado privado; el navegador nunca los toca directo.
+   Para subir se le pasan a una función del servidor junto con la clave de quien
+   está adentro, y para abrirlos se pide un enlace que dura 10 minutos. Son
+   identificaciones y estados de cuenta de gente real: no pueden quedar en una
+   dirección que cualquiera pueda adivinar. */
+const FN_DOCS = SUPA_URL + '/functions/v1/documentos';
+const MAX_DOC = 15 * 1024 * 1024;
+
+function pesoArchivo(b){
+  b = Number(b) || 0;
+  return b < 1024 ? b + ' B' : b < 1048576 ? Math.round(b/1024) + ' KB' : (b/1048576).toFixed(1) + ' MB';
+}
+async function fnDocs(cuerpo){
+  const r = await fetch(FN_DOCS, { method:'POST', headers: SUPA_H, body: JSON.stringify(cuerpo) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || ('http ' + r.status));
+  return j;
+}
+function avisoDoc(id, txt, seQuita){
+  const c = document.querySelector('#docs-' + id + ' .doc-ok');
+  if (!c) return;
+  c.textContent = txt;
+  if (seQuita) setTimeout(() => { if (c.isConnected) c.textContent = ''; }, 2500);
+}
+async function subirDocs(id, input){
+  const files = [...(input.files || [])];
+  input.value = '';
+  if (!files.length) return;
+  const a = TODAS.find(x => x.id === id);
+  const grandes = files.filter(f => f.size > MAX_DOC);
+  if (grandes.length){
+    alert('Estos pesan más de 15 MB y no se pueden subir:\n' + grandes.map(f => f.name).join('\n'));
+    if (grandes.length === files.length) return;
+  }
+  const buenos = files.filter(f => f.size <= MAX_DOC);
+  let n = 0;
+  for (const f of buenos){
+    avisoDoc(id, `Subiendo ${++n} de ${buenos.length}…`);
+    try{
+      // Se manda en base64 porque el cuerpo del mensaje es texto. Ocupa un tercio más,
+      // por eso el tope de 15 MB se revisa ANTES de convertirlo.
+      const b64 = await new Promise((ok, mal) => {
+        const fr = new FileReader();
+        fr.onload = () => ok(String(fr.result).split(',')[1] || '');
+        fr.onerror = () => mal(new Error('no se pudo leer'));
+        fr.readAsDataURL(f);
+      });
+      const j = await fnDocs({ accion:'subir', codigo: CODIGO, id, nombre: f.name,
+                               tipo: f.type || 'application/octet-stream', datos: b64, quien: QUIEN });
+      a.docs = (a.docs || []).concat([j.doc]);
+      pintar();
+    }catch(e){
+      avisoDoc(id, '', false);
+      alert('No se pudo subir "' + f.name + '".' + (e.message === 'muy_grande' ? ' Pesa demasiado.' : ' Revisa el internet.'));
+      return;
+    }
+  }
+  avisoDoc(id, buenos.length === 1 ? 'Subido ✓' : buenos.length + ' subidos ✓', true);
+}
+async function verDoc(id, ruta, btn){
+  const antes = btn.textContent;
+  btn.textContent = 'Abriendo…';
+  try{
+    const j = await fnDocs({ accion:'ver', codigo: CODIGO, id, ruta });
+    window.open(j.url, '_blank', 'noopener');
+  }catch(e){ alert('No se pudo abrir el documento.'); }
+  btn.textContent = antes;
+}
+async function borrarDoc(id, docId, ruta){
+  const a = TODAS.find(x => x.id === id);
+  const d = (a.docs || []).find(x => x.id === docId);
+  if (!confirm('¿Quitar "' + (d ? d.nombre : 'este documento') + '"? No se puede deshacer.')) return;
+  const antes = a.docs;
+  a.docs = (a.docs || []).filter(x => x.id !== docId); pintar();
+  try{ await fnDocs({ accion:'borrar', codigo: CODIGO, id, docId, ruta }); avisoDoc(id, 'Quitado ✓', true); }
+  catch(e){ a.docs = antes; pintar(); alert('No se pudo quitar el documento.'); }
 }
 
 function abrir(id){ ABIERTA = ABIERTA === id ? null : id; pintar(); }

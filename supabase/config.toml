@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.recordatorios]
 verify_jwt = false
+
+[functions.documentos]
+verify_jwt = false

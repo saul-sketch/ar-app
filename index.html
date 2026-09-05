@@ -233,6 +233,18 @@
       <div>Este es el link con todas las respuestas. Pásaselo a Finance por mensaje — se abre solo, sin clave.</div>
     </div>
     <div id="aviso-correo"></div>
+    <!-- Los documentos se piden DESPUÉS de enviar, no antes: la aplicación ya está
+         guardada, así que si el cliente tarda buscando su ID o se cae el internet no
+         se pierde nada de lo que el vendedor escribió. -->
+    <div class="field" style="margin-bottom:14px">
+      <div class="field-label">Documentos del cliente <span class="opt">(opcional)</span></div>
+      <div class="qhint" style="margin-bottom:8px">ID o licencia, talones de pago, estados de cuenta. Los ve Finance; el cliente no.</div>
+      <div id="docs-lista"></div>
+      <label class="btn btn-ghost" style="cursor:pointer;display:inline-block">+ Agregar archivos
+        <input type="file" multiple style="display:none" id="docs-input" onchange="subirDocsForm(this)">
+      </label>
+      <span id="docs-aviso" style="font-size:13px;color:var(--gray-500);font-weight:600;margin-left:8px"></span>
+    </div>
     <div class="field">
       <div class="field-label">Link de esta aplicación</div>
       <input class="field-input" id="link-out" readonly onclick="this.select()" style="font-size:13px">
@@ -506,6 +518,56 @@ async function enviar(){
     document.getElementById('error-box').innerHTML =
       `<div class="nota warn"><span>⚠️</span><div><strong>No se pudo enviar.</strong> Revisa el internet e intenta otra vez. Nada de lo que escribiste se perdió.</div></div>`;
   }
+}
+
+/* Documentos: mismo camino que el panel. El navegador nunca escribe directo en el
+   guardado — le pasa el archivo a una función del servidor junto con el código de la
+   aplicación, que es lo que prueba que quien sube es quien la acaba de crear. */
+const MAX_DOC = 15 * 1024 * 1024;
+async function subirDocsForm(input){
+  const files = [...(input.files || [])]; input.value = '';
+  if (!files.length || !window._ultima) return;
+  const a = window._ultima;
+  a.docs = a.docs || [];
+  const aviso = document.getElementById('docs-aviso');
+  const grandes = files.filter(f => f.size > MAX_DOC);
+  if (grandes.length) alert('Estos pesan más de 15 MB y no se pueden subir:\n' + grandes.map(f=>f.name).join('\n'));
+  const buenos = files.filter(f => f.size <= MAX_DOC);
+  let n = 0;
+  for (const f of buenos){
+    aviso.textContent = `Subiendo ${++n} de ${buenos.length}…`;
+    try{
+      const b64 = await new Promise((ok, mal) => {
+        const fr = new FileReader();
+        fr.onload = () => ok(String(fr.result).split(',')[1] || '');
+        fr.onerror = () => mal(new Error('x'));
+        fr.readAsDataURL(f);
+      });
+      const r = await fetch(SUPA_URL + '/functions/v1/documentos', {
+        method:'POST', headers: SUPA_H,
+        body: JSON.stringify({ accion:'subir', codigo: a.codigo, id: a.id, nombre: f.name,
+                               tipo: f.type || 'application/octet-stream', datos: b64,
+                               quien: a.vendedor_nombre })
+      });
+      const j = await r.json().catch(()=>({}));
+      if (!r.ok) throw new Error(j.error || 'x');
+      a.docs.push(j.doc);
+      pintarDocsForm();
+    }catch(e){
+      aviso.textContent = '';
+      alert('No se pudo subir "' + f.name + '". Revisa el internet e intenta otra vez.');
+      return;
+    }
+  }
+  aviso.textContent = buenos.length === 1 ? 'Subido ✓' : buenos.length + ' subidos ✓';
+  setTimeout(() => { aviso.textContent = ''; }, 2500);
+}
+function pintarDocsForm(){
+  const c = document.getElementById('docs-lista');
+  const d = (window._ultima && window._ultima.docs) || [];
+  c.innerHTML = d.length
+    ? d.map(x => `<div class="qhint" style="color:var(--gray-900);font-weight:600">📎 ${esc(x.nombre)}</div>`).join('')
+    : '';
 }
 
 async function enviarCopiaSola(codigo){
