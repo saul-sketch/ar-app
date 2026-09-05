@@ -138,7 +138,11 @@ Deno.serve(async (req) => {
     }
     if (a.deal_number) campos.push({ name: "Deal #", value: String(a.deal_number), inline: true });
     if (ultima?.texto) {
-      campos.push({ name: `Última nota${ultima.quien ? " · " + ultima.quien : ""}`,
+      // Se muestra CUÁNTAS notas hay, no solo la última: si Finance escribió tres
+      // seguidas, quien mira la tarjeta tiene que saber que hay más abajo en el panel
+      // en vez de creer que esa es toda la historia.
+      const cuantas = notas.length > 1 ? ` · ${notas.length} en total` : "";
+      campos.push({ name: `Última nota${ultima.quien ? " · " + ultima.quien : ""}${cuantas}`,
                     value: String(ultima.texto).slice(0, 900), inline: false });
     }
     if ((a.docs || []).length) {
@@ -178,9 +182,25 @@ Deno.serve(async (req) => {
       }
     }
 
+    /* Avisar SOLO si esta noticia no se dio ya. Sin esto, un doble clic, dos managers
+       poniendo el mismo veredicto, o simplemente escribir una nota después de aprobar
+       le sonaban al vendedor otra vez por algo que ya sabía. Se guarda cuál fue el
+       último veredicto anunciado y se compara: cambió de verdad → suena; es el mismo →
+       la tarjeta se actualiza en silencio.
+       Quitar el veredicto deja el registro en blanco, así que si más tarde se vuelve a
+       aprobar, esa sí es noticia nueva y vuelve a sonar. */
+    const yaAvisado = a.discord_aviso || null;
+    const esNoticia = !!v && a.veredicto !== "historico" && a.veredicto !== yaAvisado;
+    if (!a.veredicto && yaAvisado) {
+      await fetch(`${SUPA}/rest/v1/rpc/ar_oa_discord_aviso`, {
+        method: "POST", headers: { ...H, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_id: a.id, p_v: null }),
+      }).catch(() => {});
+    }
+
     // Editar no notifica. Si lo que cambió es el veredicto, va una línea corta aparte
     // para que suene; las notas no arman ruido en el canal.
-    if (v && a.veredicto !== "historico") {
+    if (esNoticia) {
       await fetch(DISCORD, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -189,9 +209,8 @@ Deno.serve(async (req) => {
         }),
       }).catch(() => {});
     }
-    // Avisarle al vendedor en el canal de su tienda. Solo cuando hay veredicto: una
-    // nota suelta no le sirve de nada si todavía no le dijeron sí o no.
-    if (v && a.veredicto !== "historico") {
+    // Avisarle al vendedor en el canal de su tienda.
+    if (esNoticia) {
       const canal = CANAL_TIENDA[String(a.location || "").toLowerCase().trim()];
       if (canal) {
         const quéHacer = a.veredicto === "aprobado"
@@ -218,8 +237,12 @@ Deno.serve(async (req) => {
             }],
         });
       }
+      await fetch(`${SUPA}/rest/v1/rpc/ar_oa_discord_aviso`, {
+        method: "POST", headers: { ...H, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_id: a.id, p_v: a.veredicto }),
+      }).catch(() => {});
     }
-    return json({ ok: true });
+    return json({ ok: true, aviso: esNoticia ? "enviado" : "ya se habia avisado" });
   } catch (e) {
     return json({ ok: false, motivo: String((e as Error)?.message || e) }, 500);
   }
