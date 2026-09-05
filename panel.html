@@ -243,7 +243,7 @@
            camino más corto. Los filtros son para explorar; la búsqueda para llegar. -->
       <div class="buscador">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-        <input id="buscar" placeholder="Buscar por cliente, teléfono, Deal # o vendedor…">
+        <input id="buscar" placeholder="Nombre, teléfono, Deal #, vendedor o algo de una nota…">
         <button id="chip-limpiar" onclick="limpiarFiltros()" style="display:none">Quitar filtros</button>
       </div>
       <!-- Cada fila filtra UNA cosa y las tres se cruzan. La etiqueta va en una columna
@@ -590,7 +590,12 @@ function ficoSinPuntaje(a){ return mejorFico(a) == null && !!(a.fico_txt || a.fi
 // Lo que se muestra en el campo: el número, o la palabra que escribieron.
 function ficoTxt(num, txt){ return num != null ? String(num) : (txt || ''); }
 function visibles(){
-  const q = BUSCA.toLowerCase().trim();
+  const q = sinAcentos(BUSCA);
+  // Si lo que escribieron trae números, se compara también contra SOLO los dígitos.
+  // El teléfono se guarda como "(407) 484-1680": sin esto, buscar 4074841680 o
+  // 484-1680 no encontraba nada, y es la forma natural de pegar un número.
+  // El +1 se quita: pegando del CRM viene "+1 (689) 231-7554" y guardado está sin el 1.
+  const qd = BUSCA.replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
   return deLaTienda().filter(a => {
     // Veredicto y etapa son ejes distintos: se cruzan, no se pisan.
     if (VER === 'sinrevisar' && a.veredicto) return false;
@@ -615,8 +620,15 @@ function visibles(){
     if (FICO_MIN != null && (fmax == null || fmax < FICO_MIN)) return false;
     if (FICO_MAX != null && (fmax == null || fmax > FICO_MAX)) return false;
     if (!q) return true;
-    return [a.cliente_nombre, a.cliente_telefono, a.vendedor_nombre, a.vehiculo_especifico, a.notas, a.deal_number]
-      .some(x => String(x || '').toLowerCase().includes(q));
+    if (qd.length >= 3){
+      const digitos = [a.cliente_telefono, a.deal_number, a.codigo].map(x => String(x || '').replace(/\D/g, ''));
+      if (digitos.some(d => d && d.includes(qd))) return true;
+    }
+    if (!q) return false;
+    return [a.cliente_nombre, a.cliente_telefono, a.vendedor_nombre, a.vehiculo_especifico,
+            a.notas, a.deal_number, a.codigo, a.fico_txt, a.fico_co_txt,
+            ...(a.bitacora || []).map(n => n.texto)]
+      .some(x => sinAcentos(x).includes(q));
   });
 }
 
@@ -635,6 +647,9 @@ function kpiRango(p){
   if (p === 'mes')    return [new Date(hoy.getFullYear(), hoy.getMonth(), 1), new Date(8.64e15), 'Este mes'];
   return [new Date(0), new Date(8.64e15), 'Todo'];
 }
+/* Buscar sin tropezar con tildes ni mayúsculas: en esta lista hay "Javier Nuñez",
+   "Núñez" y "NUNEZ", y quien busca no sabe cuál escribió el vendedor. */
+const sinAcentos = t => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 const enRango = (iso, a, b) => { if (!iso) return false; const t = new Date(iso); return t >= a && t < b; };
 
 function verKpis(){
