@@ -276,6 +276,7 @@
           <div class="fchips">
             <button class="chip on" data-fi="todas">Todos</button>
             <button class="chip" data-fi="sin">Sin revisar</button>
+            <button class="chip" data-fi="nohit">Sin puntaje</button>
             <button class="chip" data-fi="700">700+</button>
             <button class="chip" data-fi="650">650+</button>
             <button class="chip" data-fi="600">600+</button>
@@ -378,7 +379,7 @@ function ocupado(){
    refrescos no traen nada nuevo, y no redibujar es la unica forma segura de no
    moverle nada a quien esta trabajando. */
 function huella(filas){
-  return filas.map(a => [a.id, a.estado, a.veredicto, a.deal_number, a.fico, a.fico_co,
+  return filas.map(a => [a.id, a.estado, a.veredicto, a.deal_number, a.fico, a.fico_co, a.fico_txt, a.fico_co_txt,
     (a.bitacora||[]).length, a.copia_estado, a.crm_contact_id].join('~')).join('|');
 }
 
@@ -583,6 +584,11 @@ function mejorFico(a){
   const v = [a.fico, a.fico_co].filter(x => x != null).map(Number);
   return v.length ? Math.max(...v) : null;
 }
+// Ya le miraron el crédito, aunque el buró no haya devuelto puntaje ("no hit").
+function ficoRevisado(a){ return mejorFico(a) != null || !!(a.fico_txt || a.fico_co_txt); }
+function ficoSinPuntaje(a){ return mejorFico(a) == null && !!(a.fico_txt || a.fico_co_txt); }
+// Lo que se muestra en el campo: el número, o la palabra que escribieron.
+function ficoTxt(num, txt){ return num != null ? String(num) : (txt || ''); }
 function visibles(){
   const q = BUSCA.toLowerCase().trim();
   return deLaTienda().filter(a => {
@@ -599,8 +605,11 @@ function visibles(){
     // signer 540, esa aplicación sí califica para "700+", que es lo que uno busca
     // al preguntarse cuáles pueden aprobar.
     const fmax = mejorFico(a);
-    if (FICO === 'sin' && fmax != null) return false;
-    if (FICO !== 'todas' && FICO !== 'sin'){
+    // "Sin revisar" = nadie miró el crédito. Un "no hit" SÍ lo miraron, así que sale
+    // de ahí y tiene su propio botón: si no, quedaba escondido en todos los filtros.
+    if (FICO === 'sin' && ficoRevisado(a)) return false;
+    if (FICO === 'nohit' && !ficoSinPuntaje(a)) return false;
+    if (FICO !== 'todas' && FICO !== 'sin' && FICO !== 'nohit'){
       if (fmax == null || fmax < Number(FICO)) return false;
     }
     if (FICO_MIN != null && (fmax == null || fmax < FICO_MIN)) return false;
@@ -742,8 +751,10 @@ function pintarKpis(){
       <h3>Crédito</h3>
       ${(() => {
         const con = base.filter(x => mejorFico(x) != null);
-        if (!con.length) return `<div class="kpi-hint">Todavía nadie ha anotado un FICO. En cuanto Finance empiece a ponerlos, aquí sale si el puntaje predice la aprobación.</div>`;
-        const prom = Math.round(con.reduce((t,x) => t + mejorFico(x), 0) / con.length);
+        const nohit = base.filter(ficoSinPuntaje).length;   // buró sin historial: revisadas, pero sin número
+        const faltan = base.filter(x => !ficoRevisado(x)).length;
+        if (!con.length && !nohit) return `<div class="kpi-hint">Todavía nadie ha anotado un FICO. En cuanto Finance empiece a ponerlos, aquí sale si el puntaje predice la aprobación.</div>`;
+        const prom = con.length ? Math.round(con.reduce((t,x) => t + mejorFico(x), 0) / con.length) : null;
         const conCo = con.filter(x => x.fico_co != null).length;
         /* Lo que importa no es el promedio sino si el puntaje separa aprobadas de
            negadas. Por eso cada banda muestra su tasa: si 700+ aprueba 80% y 550
@@ -753,8 +764,8 @@ function pintarKpis(){
                         ['menos de 550', x=>x<550, 'var(--red)']];
         return `
         <div class="kpi-hint">
-          <b>${con.length}</b> de ${base.length} tienen puntaje · faltan <b>${base.length - con.length}</b> ·
-          promedio <b>${prom}</b>${conCo ? ` · <b>${conCo}</b> con co-signer` : ''}
+          <b>${con.length}</b> de ${base.length} tienen puntaje${prom ? ` · promedio <b>${prom}</b>` : ''} ·
+          faltan por revisar <b>${faltan}</b>${nohit ? ` · <b>${nohit}</b> sin historial de crédito` : ''}${conCo ? ` · <b>${conCo}</b> con co-signer` : ''}
         </div>
         <div class="tabla-scroll"><table class="tabla">
           <thead><tr><th>Puntaje</th><th>Cuántas</th><th>Aprobadas</th><th>Negadas</th><th>Tasa</th></tr></thead>
@@ -904,10 +915,10 @@ function fila(a){
       <div class="dealbox">
         <span class="k">FICO</span>
         <label class="ficolbl">signer
-          <input class="field-input" id="fico-${a.id}" value="${a.fico != null ? a.fico : ''}" inputmode="numeric"
-                 placeholder="ej. 620" onkeydown="if(event.key==='Enter')guardarFico('${a.id}')"></label>
+          <input class="field-input" id="fico-${a.id}" value="${esc(ficoTxt(a.fico, a.fico_txt))}"
+                 placeholder="620 o no hit" onkeydown="if(event.key==='Enter')guardarFico('${a.id}')"></label>
         <label class="ficolbl">co-signer
-          <input class="field-input" id="ficoco-${a.id}" value="${a.fico_co != null ? a.fico_co : ''}" inputmode="numeric"
+          <input class="field-input" id="ficoco-${a.id}" value="${esc(ficoTxt(a.fico_co, a.fico_co_txt))}"
                  placeholder="si hay" onkeydown="if(event.key==='Enter')guardarFico('${a.id}')"></label>
         <button class="btn btn-ghost" onclick="guardarFico('${a.id}')">Guardar</button>
         ${a.fico_por ? `<span class="quien">lo puso <b>${esc(a.fico_por)}</b>${a.fico_at ? ' · ' + esc(cuandoRelativo(a.fico_at)) : ''}</span>` : ''}
@@ -1138,31 +1149,46 @@ async function guardarDeal(id){
    quién lo consultó. Vacío = todavía no lo han mirado. */
 async function guardarFico(id){
   const a = TODAS.find(x => x.id === id);
+  /* Acepta el puntaje o una palabra. Hay clientes sin historial de crédito — el buró
+     no devuelve número, devuelve "no hit" — y antes no había forma de anotarlo: quedaba
+     vacío, igual que si nadie lo hubiera mirado. Son dos cosas distintas.
+     Si lo escrito es un puntaje válido se guarda como número, para que los filtros por
+     rango y el promedio sigan funcionando; si no, se guarda como texto aparte. */
   const leer = (pre) => {
     const inp = document.getElementById(pre + '-' + id);
     const txt = (inp.value || '').trim();
-    if (txt === '') { inp.classList.remove('invalid'); return { ok: true, v: null }; }
-    const n = parseInt(txt, 10);
-    if (!Number.isFinite(n) || n < 300 || n > 900){ inp.classList.add('invalid'); return { ok: false }; }
     inp.classList.remove('invalid');
-    return { ok: true, v: n };
+    if (txt === '') return { ok: true, v: null, t: null };
+    if (/^\d+$/.test(txt)){
+      const n = parseInt(txt, 10);
+      if (n < 300 || n > 900){ inp.classList.add('invalid'); return { ok: false, num: true }; }
+      return { ok: true, v: n, t: null };
+    }
+    if (txt.length > 24){ inp.classList.add('invalid'); return { ok: false }; }
+    return { ok: true, v: null, t: txt };
   };
   const s = leer('fico'), c = leer('ficoco');
-  if (!s.ok || !c.ok) { alert('El FICO va de 300 a 900.'); return; }
-  const antes = { f: a.fico, fc: a.fico_co, por: a.fico_por, at: a.fico_at };
-  if (s.v === antes.f && c.v === antes.fc) return;
-  const hay = s.v !== null || c.v !== null;
-  a.fico = s.v; a.fico_co = c.v;
+  if (!s.ok || !c.ok) {
+    alert((s.num || c.num) ? 'Si escribes un número, el FICO va de 300 a 900.\nSi no hay puntaje, escribe "no hit".'
+                           : 'Eso es muy largo. Escribe el puntaje o algo corto como "no hit".');
+    return;
+  }
+  const antes = { f: a.fico, fc: a.fico_co, ft: a.fico_txt, fct: a.fico_co_txt, por: a.fico_por, at: a.fico_at };
+  if (s.v === antes.f && c.v === antes.fc && (s.t||null) === (antes.ft||null) && (c.t||null) === (antes.fct||null)) return;
+  const hay = s.v !== null || c.v !== null || s.t !== null || c.t !== null;
+  a.fico = s.v; a.fico_co = c.v; a.fico_txt = s.t; a.fico_co_txt = c.t;
   a.fico_por = hay ? QUIEN : null;
   a.fico_at  = hay ? new Date().toISOString() : null;
   pintar();
   try{
-    const r = await rpc('ar_oa_fico', { p_codigo: CODIGO, p_id: id, p_fico: s.v, p_fico_co: c.v });
+    const r = await rpc('ar_oa_fico', { p_codigo: CODIGO, p_id: id, p_fico: s.v, p_fico_co: c.v,
+                                        p_fico_txt: s.t, p_fico_co_txt: c.t });
     if (!Array.isArray(r) || !r.length) throw new Error('no se guardó');
     const el = document.querySelector('.fico-ok');
     if (el) { el.textContent = hay ? 'Guardado ✓' : 'Quitado ✓'; setTimeout(() => { if (el.isConnected) el.textContent = ''; }, 2200); }
   }catch(e){
-    a.fico = antes.f; a.fico_co = antes.fc; a.fico_por = antes.por; a.fico_at = antes.at; pintar();
+    a.fico = antes.f; a.fico_co = antes.fc; a.fico_txt = antes.ft; a.fico_co_txt = antes.fct;
+    a.fico_por = antes.por; a.fico_at = antes.at; pintar();
     alert('No se pudo guardar el FICO. Revisa el internet.');
   }
 }
