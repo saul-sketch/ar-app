@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.documentos]
 verify_jwt = false
+
+[functions.discord-estado]
+verify_jwt = false

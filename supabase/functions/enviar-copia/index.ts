@@ -222,20 +222,34 @@ async function aDiscord(a: Record<string, any>, link: string) {
   if (a.deal_number) campos.push({ name: "Deal #", value: String(a.deal_number), inline: true });
   if (a.notas) campos.push({ name: "Lo que dijo el cliente", value: String(a.notas).slice(0, 900), inline: false });
 
-  await fetch(DISCORD, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      content: corre ? "**Compra ya** — conviene mirarla pronto" : "",
-      embeds: [{
-        title: `${a.cliente_nombre}${a.deal_number ? " · #" + a.deal_number : ""}`,
-        url: link,
-        description: `${fono(a.cliente_telefono)}\nEnviada ${fechaHora(a.created_at)}`,
-        color: corre ? 0xef4444 : 0x1a1a2e,
-        fields: campos,
-        footer: { text: "Aplicación online · Auto Republic" },
-      }],
-    }),
-  }).catch(() => {});
+  // ?wait=true hace que Discord devuelva el mensaje que acaba de crear. Se guarda su id
+  // para poder EDITAR este mismo mensaje cuando Finance ponga el veredicto, en vez de
+  // publicar otro aparte: así el canal tiene una tarjeta por aplicación, siempre al día.
+  try {
+    const r = await fetch(DISCORD + "?wait=true", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        content: corre ? "**Compra ya** — conviene mirarla pronto" : "",
+        embeds: [{
+          title: `${a.cliente_nombre}${a.deal_number ? " · #" + a.deal_number : ""}`,
+          url: link,
+          description: `${fono(a.cliente_telefono)}\nEnviada ${fechaHora(a.created_at)}`,
+          color: corre ? 0xef4444 : 0x1a1a2e,
+          fields: campos,
+          footer: { text: "Aplicación online · Auto Republic" },
+        }],
+      }),
+    });
+    if (r.ok) {
+      const msg = await r.json().catch(() => null);
+      if (msg?.id) {
+        await fetch(`${SUPA}/rest/v1/rpc/ar_oa_discord_id`, {
+          method: "POST", headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ p_id: a.id, p_msg: String(msg.id) }),
+        }).catch(() => {});
+      }
+    }
+  } catch (_) { /* el aviso nunca puede frenar la aplicación, que ya está guardada */ }
 }
 
 Deno.serve(async (req) => {
