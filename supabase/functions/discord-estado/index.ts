@@ -12,6 +12,13 @@
 const SUPA     = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const DISCORD  = Deno.env.get("DISCORD_APLICACIONES") ?? "";
+// Canales donde están los vendedores, uno por tienda. Al vendedor le importa UNA cosa:
+// si puede llamar al cliente y traerlo. Por eso el aviso va a su canal y no al de
+// Finance, que es donde se discute el crédito.
+const CANAL_TIENDA: Record<string, string> = {
+  "orlando":   Deno.env.get("DISCORD_VEND_ORLANDO") ?? "",
+  "kissimmee": Deno.env.get("DISCORD_VEND_KISSIMMEE") ?? "",
+};
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -133,6 +140,33 @@ Deno.serve(async (req) => {
                    `${ultima?.texto ? `\n> ${String(ultima.texto).slice(0, 300)}` : ""}`,
         }),
       }).catch(() => {});
+    }
+    // Avisarle al vendedor en el canal de su tienda. Solo cuando hay veredicto: una
+    // nota suelta no le sirve de nada si todavía no le dijeron sí o no.
+    if (v && a.veredicto !== "historico") {
+      const canal = CANAL_TIENDA[String(a.location || "").toLowerCase().trim()];
+      if (canal) {
+        const quéHacer = a.veredicto === "aprobado"
+          ? "Llama al cliente y tráelo."
+          : a.veredicto === "posible"
+            ? "Falta algo para cerrarla — mira la nota."
+            : "No pasó. Si consigues co-signer o más down, avísale a Finance.";
+        await fetch(canal, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            embeds: [{
+              title: `${v.emoji} ${a.cliente_nombre} — ${v.txt}`,
+              url: `https://saul-sketch.github.io/ar-app/${a.codigo}`,
+              description: `**${a.vendedor_nombre ?? "—"}** · ${fono(a.cliente_telefono)}\n${quéHacer}`,
+              color: v.color,
+              fields: ultima?.texto
+                ? [{ name: "Nota de Finance", value: String(ultima.texto).slice(0, 600), inline: false }]
+                : [],
+              footer: { text: `Revisada por ${a.veredicto_por ?? quien}` },
+            }],
+          }),
+        }).catch(() => {});
+      }
     }
     return json({ ok: true });
   } catch (e) {
