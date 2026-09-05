@@ -20,10 +20,35 @@ const DISCORD  = Deno.env.get("DISCORD_APLICACIONES") ?? "";
    webhook sirve para un solo canal; el bot puede escribir en cualquiera donde esté,
    así que agregar una tienda mañana es una línea aquí y nada más. */
 const BOT = Deno.env.get("DISCORD_BOT_TOKEN") ?? "";
+/* El canal se decide por el EQUIPO del vendedor, no por la tienda de la cita.
+   Juviany es del call center y agenda citas para las dos tiendas: si el aviso fuera
+   por la tienda, le llegaría a #sales-team-kissimmee, donde ella ni está. El call
+   center tiene canal fijo; los closers, el de su tienda. */
+const CANAL_EQUIPO: Record<string, string> = {
+  "call-center":       "1467924390657261579",   // #call-center-general
+  "closers-orlando":   "1468209039685976075",   // #sales-team-orlando
+  "closers-kissimmee": "1468208867086307359",   // #sales-team-kissimmee
+};
+// Si no se sabe el equipo (alguien nuevo, sin rol asignado), se cae a la tienda de la
+// cita: es peor no avisarle a nadie que avisar en un canal aproximado.
 const CANAL_TIENDA: Record<string, string> = {
   "orlando":   "1468209039685976075",
   "kissimmee": "1468208867086307359",
 };
+
+async function canalDelVendedor(nombre: string, location: string): Promise<string> {
+  try {
+    const r = await fetch(`${SUPA}/rest/v1/rpc/ar_oa_equipo_de`, {
+      method: "POST", headers: { ...H, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_nombre: nombre }),
+    });
+    if (r.ok) {
+      const equipo = await r.json();
+      if (equipo && CANAL_EQUIPO[equipo]) return CANAL_EQUIPO[equipo];
+    }
+  } catch { /* sigue al respaldo */ }
+  return CANAL_TIENDA[String(location || "").toLowerCase().trim()] || "";
+}
 const GUILD = "1467661813545046183";
 
 /* Buscar al vendedor entre la gente del servidor para poder mencionarlo.
@@ -211,7 +236,7 @@ Deno.serve(async (req) => {
     }
     // Avisarle al vendedor en el canal de su tienda.
     if (esNoticia) {
-      const canal = CANAL_TIENDA[String(a.location || "").toLowerCase().trim()];
+      const canal = await canalDelVendedor(a.vendedor_nombre, a.location);
       if (canal) {
         const quéHacer = a.veredicto === "aprobado"
           ? "Llama al cliente y tráelo."
