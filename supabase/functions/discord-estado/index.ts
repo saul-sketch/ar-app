@@ -12,13 +12,26 @@
 const SUPA     = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const DISCORD  = Deno.env.get("DISCORD_APLICACIONES") ?? "";
-// Canales donde están los vendedores, uno por tienda. Al vendedor le importa UNA cosa:
-// si puede llamar al cliente y traerlo. Por eso el aviso va a su canal y no al de
-// Finance, que es donde se discute el crédito.
+/* Canales donde están los vendedores, uno por tienda: #sales-team-orlando y
+   #sales-team-kissimmee. Al vendedor le importa UNA cosa: si puede llamar al cliente
+   y traerlo. Por eso el aviso va a su canal y no al de Finance, donde se discute el
+   crédito y él ni entra.
+   Se publica con el bot del Command Center, que ya vive en esos dos canales. Un
+   webhook sirve para un solo canal; el bot puede escribir en cualquiera donde esté,
+   así que agregar una tienda mañana es una línea aquí y nada más. */
+const BOT = Deno.env.get("DISCORD_BOT_TOKEN") ?? "";
 const CANAL_TIENDA: Record<string, string> = {
-  "orlando":   Deno.env.get("DISCORD_VEND_ORLANDO") ?? "",
-  "kissimmee": Deno.env.get("DISCORD_VEND_KISSIMMEE") ?? "",
+  "orlando":   "1468209039685976075",
+  "kissimmee": "1468208867086307359",
 };
+async function aCanal(canalId: string, cuerpo: unknown) {
+  if (!BOT || !canalId) return;
+  await fetch(`https://discord.com/api/v10/channels/${canalId}/messages`, {
+    method: "POST",
+    headers: { Authorization: `Bot ${BOT}`, "Content-Type": "application/json" },
+    body: JSON.stringify(cuerpo),
+  }).catch(() => {});
+}
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -151,9 +164,7 @@ Deno.serve(async (req) => {
           : a.veredicto === "posible"
             ? "Falta algo para cerrarla — mira la nota."
             : "No pasó. Si consigues co-signer o más down, avísale a Finance.";
-        await fetch(canal, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        await aCanal(canal, {
             embeds: [{
               title: `${v.emoji} ${a.cliente_nombre} — ${v.txt}`,
               url: `https://saul-sketch.github.io/ar-app/${a.codigo}`,
@@ -164,8 +175,7 @@ Deno.serve(async (req) => {
                 : [],
               footer: { text: `Revisada por ${a.veredicto_por ?? quien}` },
             }],
-          }),
-        }).catch(() => {});
+        });
       }
     }
     return json({ ok: true });
