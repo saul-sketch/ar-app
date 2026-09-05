@@ -563,6 +563,9 @@ function pintarMenus(){
    lo que llevan esperando, y de ultimo lo ya resuelto. */
 const PESO_URG = { hoy: 4, '2-3dias': 3, semana: 2, mes: 1, sin_fecha: 0.5 };
 function quema(a){
+  // Mientras está abierta se queda donde está: si al ponerle veredicto se fuera al
+  // fondo de la lista, quien la trabaja la perdería de vista igual que si desapareciera.
+  if (a.id === ABIERTA) return 1e9;
   const h = (Date.now() - new Date(a.created_at)) / 36e5;
   let p = 0;
   if (vieneHoy(a)) p += 10000;                       // lo de hoy va primero, siempre
@@ -597,6 +600,12 @@ function visibles(){
   // El +1 se quita: pegando del CRM viene "+1 (689) 231-7554" y guardado está sin el 1.
   const qd = BUSCA.replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
   return deLaTienda().filter(a => {
+    /* La ficha que está ABIERTA no se va de la lista aunque deje de coincidir con el
+       filtro. Estando en "Sin revisar", ponerle un veredicto la sacaba de la lista al
+       instante: se cerraba sola en la cara de quien la estaba trabajando, justo cuando
+       todavía iba a escribir la nota. El filtro es para elegir qué mirar, no para
+       arrebatar lo que uno tiene abierto. Al cerrarla se va sola, como debe ser. */
+    if (a.id === ABIERTA) return true;
     // Veredicto y etapa son ejes distintos: se cruzan, no se pisan.
     if (VER === 'sinrevisar' && a.veredicto) return false;
     if (['aprobado','posible','negado'].includes(VER) && a.veredicto !== VER) return false;
