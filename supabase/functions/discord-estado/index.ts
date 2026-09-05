@@ -24,6 +24,41 @@ const CANAL_TIENDA: Record<string, string> = {
   "orlando":   "1468209039685976075",
   "kissimmee": "1468208867086307359",
 };
+const GUILD = "1467661813545046183";
+
+/* Buscar al vendedor entre la gente del servidor para poder mencionarlo.
+   Se compara por nombre porque es lo único que tenemos: la aplicación guarda
+   "Diego Corredor" y en Discord está como "Diego Corredor". Pide que coincidan
+   nombre Y apellido — con solo el nombre de pila se corre el riesgo de mencionar
+   al Diego equivocado, y eso es peor que no mencionar a nadie. */
+const _sinTildes = (t: string) =>
+  t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+async function mencionDe(nombre: string): Promise<string | null> {
+  const n = _sinTildes(String(nombre || ""));
+  const partes = n.split(/\s+/).filter((p) => p.length > 2);
+  if (!BOT || !partes.length) return null;
+  try {
+    const r = await fetch(
+      `https://discord.com/api/v10/guilds/${GUILD}/members/search?query=${encodeURIComponent(partes[0])}&limit=10`,
+      { headers: { Authorization: `Bot ${BOT}` } },
+    );
+    if (!r.ok) return null;
+    const miembros = await r.json();
+    if (!Array.isArray(miembros)) return null;
+    let mejor: any = null, puntos = 0;
+    for (const m of miembros) {
+      const etiquetas = [m.nick, m.user?.global_name, m.user?.username].filter(Boolean).map(_sinTildes);
+      let p = 0;
+      for (const parte of partes) if (etiquetas.some((e: string) => e.includes(parte))) p++;
+      if (p > puntos) { puntos = p; mejor = m; }
+    }
+    // Con una sola coincidencia (solo el nombre de pila) no basta si hay apellido.
+    const exige = partes.length > 1 ? 2 : 1;
+    return (mejor && puntos >= exige) ? `<@${mejor.user.id}>` : null;
+  } catch { return null; }
+}
+
 async function aCanal(canalId: string, cuerpo: unknown) {
   if (!BOT || !canalId) return;
   await fetch(`https://discord.com/api/v10/channels/${canalId}/messages`, {
@@ -164,7 +199,13 @@ Deno.serve(async (req) => {
           : a.veredicto === "posible"
             ? "Falta algo para cerrarla — mira la nota."
             : "No pasó. Si consigues co-signer o más down, avísale a Finance.";
+        // La mención va en el TEXTO, no dentro del recuadro: Discord no avisa por las
+        // menciones que están dentro de un embed. Si va solo ahí, se ve azul pero no
+        // le suena a nadie — que es exactamente lo que no queremos.
+        const mencion = await mencionDe(a.vendedor_nombre);
         await aCanal(canal, {
+            content: mencion ? `${mencion} — ${v.emoji} **${a.cliente_nombre}**: ${v.txt}` : "",
+            allowed_mentions: { parse: ["users"] },
             embeds: [{
               title: `${v.emoji} ${a.cliente_nombre} — ${v.txt}`,
               url: `https://saul-sketch.github.io/ar-app/${a.codigo}`,
