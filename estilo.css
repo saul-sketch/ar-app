@@ -120,3 +120,9 @@ textarea.field-input{min-height:88px;resize:vertical;line-height:1.5;}
 .doc-vacio{font-size:13px;color:var(--gray-400)}
 .doc-add{cursor:pointer;font-size:13px}
 .doc-ok{font-size:12px;color:var(--gray-500);font-weight:600}
+
+/* El teléfono, dentro de la fila que abre y cierra la ficha: se puede seleccionar con
+   el mouse y un toque lo copia. Sin esto el click llegaba a la fila y la cerraba antes
+   de poder marcarlo. */
+.tel{user-select:text;-webkit-user-select:text;cursor:copy;border-bottom:1px dotted var(--gray-300)}
+.tel:hover{color:var(--gray-900);border-bottom-color:var(--gray-500)}

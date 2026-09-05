@@ -874,7 +874,7 @@ function fila(a){
     <div class="top">
       <div>
         <div class="nom">${esc(a.cliente_nombre)}${a.deal_number ? ` <span class="deal">#${esc(a.deal_number)}</span>` : ''}</div>
-        <div class="linea">${esc(tel(a.cliente_telefono))} · ${esc(a.vendedor_nombre)}${a.location ? ' · ' + esc(a.location) : ''} · ${esc(cuandoRelativo(a.created_at))}</div>
+        <div class="linea"><span class="tel" onclick="copiarTel(event, this)" title="Toca para copiar · o selecciónalo con el mouse">${esc(tel(a.cliente_telefono))}</span> · ${esc(a.vendedor_nombre)}${a.location ? ' · ' + esc(a.location) : ''} · ${esc(cuandoRelativo(a.created_at))}</div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         ${vieneHoy(a) ? `<span class="badge b-azul" style="font-size:12px">📍 VIENE HOY${a.visita_hora ? ' ' + esc(a.visita_hora) : ''}</span>` : ''}
@@ -1308,6 +1308,30 @@ async function borrarDoc(id, docId, ruta){
   a.docs = (a.docs || []).filter(x => x.id !== docId); pintar();
   try{ await fnDocs({ accion:'borrar', codigo: CODIGO, id, docId, ruta }); avisoDoc(id, 'Quitado ✓', true); }
   catch(e){ a.docs = antes; pintar(); alert('No se pudo quitar el documento.'); }
+}
+
+/* El teléfono está dentro de la fila, y la fila abre y cierra la ficha al tocarla.
+   Al intentar seleccionarlo con el mouse, el click llegaba a la fila y la cerraba, así
+   que nunca se podía copiar. Ahora el click se queda aquí: un toque lo copia, y
+   arrastrar para seleccionar tampoco cierra nada. */
+let _telDown = null;
+document.addEventListener('mousedown', e => { _telDown = [e.clientX, e.clientY]; }, true);
+function copiarTel(ev, el){
+  ev.stopPropagation();
+  /* Si el dedo o el mouse se movió, fue para SELECCIONAR, no para copiar: se respeta
+     la selección y no se toca el texto. Mirar getSelection() no sirve — para cuando
+     llega el click el navegador ya la limpió en algunos casos. */
+  if (_telDown){
+    const d = Math.abs(ev.clientX - _telDown[0]) + Math.abs(ev.clientY - _telDown[1]);
+    if (d > 4) return;
+  }
+  const t = el.textContent.trim();
+  const ok = () => {
+    const antes = el.textContent;
+    el.textContent = 'copiado ✓';
+    setTimeout(() => { if (el.isConnected) el.textContent = antes; }, 1200);
+  };
+  if (navigator.clipboard) navigator.clipboard.writeText(t).then(ok).catch(ok); else ok();
 }
 
 function abrir(id){ ABIERTA = ABIERTA === id ? null : id; pintar(); }
