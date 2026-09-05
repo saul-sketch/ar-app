@@ -84,13 +84,31 @@ async function mencionDe(nombre: string): Promise<string | null> {
   } catch { return null; }
 }
 
-async function aCanal(canalId: string, cuerpo: unknown) {
-  if (!BOT || !canalId) return;
-  await fetch(`https://discord.com/api/v10/channels/${canalId}/messages`, {
-    method: "POST",
-    headers: { Authorization: `Bot ${BOT}`, "Content-Type": "application/json" },
-    body: JSON.stringify(cuerpo),
-  }).catch(() => {});
+// Publica en un canal y devuelve el id del mensaje, para poder editarlo despues.
+async function aCanal(canalId: string, cuerpo: unknown): Promise<string | null> {
+  if (!BOT || !canalId) return null;
+  try {
+    const r = await fetch(`https://discord.com/api/v10/channels/${canalId}/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bot ${BOT}`, "Content-Type": "application/json" },
+      body: JSON.stringify(cuerpo),
+    });
+    if (!r.ok) return null;
+    const m = await r.json().catch(() => null);
+    return m?.id ? String(m.id) : null;
+  } catch { return null; }
+}
+// Edita un mensaje ya publicado. false = ya no existe (lo borraron del canal).
+async function editarEnCanal(canalId: string, msgId: string, cuerpo: unknown): Promise<boolean> {
+  if (!BOT || !canalId || !msgId) return false;
+  try {
+    const r = await fetch(`https://discord.com/api/v10/channels/${canalId}/messages/${msgId}`, {
+      method: "PATCH",
+      headers: { Authorization: `Bot ${BOT}`, "Content-Type": "application/json" },
+      body: JSON.stringify(cuerpo),
+    });
+    return r.ok;
+  } catch { return false; }
 }
 
 const CORS = {
@@ -234,8 +252,14 @@ Deno.serve(async (req) => {
         }),
       }).catch(() => {});
     }
-    // Avisarle al vendedor en el canal de su tienda.
-    if (esNoticia) {
+    /* El mensaje del vendedor. Sale cuando hay veredicto y desde ahí queda VIVO: si
+       Finance escribe la nota DESPUÉS de marcar el veredicto —que es lo normal, primero
+       se decide y después se explica— este mensaje se actualiza y muestra la nota
+       buena. Antes quedaba congelado con la nota vieja y el vendedor salía a trabajar
+       con información equivocada.
+       Editar no vuelve a sonar: ya se le avisó una vez; esto corrige lo que ve cuando
+       entra a mirar. */
+    if (v && a.veredicto !== "historico") {
       const canal = await canalDelVendedor(a.vendedor_nombre, a.location);
       if (canal) {
         const quéHacer = a.veredicto === "aprobado"
@@ -244,24 +268,41 @@ Deno.serve(async (req) => {
             ? "Falta algo para cerrarla — mira la nota."
             : "No pasó. Si consigues co-signer o más down, avísale a Finance.";
         // La mención va en el TEXTO, no dentro del recuadro: Discord no avisa por las
-        // menciones que están dentro de un embed. Si va solo ahí, se ve azul pero no
-        // le suena a nadie — que es exactamente lo que no queremos.
+        // menciones que están dentro de un embed.
         const mencion = await mencionDe(a.vendedor_nombre);
-        await aCanal(canal, {
-            content: mencion ? `${mencion} — ${v.emoji} **${a.cliente_nombre}**: ${v.txt}` : "",
-            allowed_mentions: { parse: ["users"] },
-            embeds: [{
-              title: `${v.emoji} ${a.cliente_nombre} — ${v.txt}`,
-              url: `https://saul-sketch.github.io/ar-app/${a.codigo}`,
-              description: `**${a.vendedor_nombre ?? "—"}** · ${fono(a.cliente_telefono)}\n${quéHacer}`,
-              color: v.color,
-              fields: ultima?.texto
-                ? [{ name: "Nota de Finance", value: String(ultima.texto).slice(0, 600), inline: false }]
-                : [],
-              footer: { text: `Revisada por ${a.veredicto_por ?? quien}` },
-            }],
-        });
+        // Van las últimas notas, no solo una: cuando Finance escribe dos seguidas, la
+        // segunda suele ser la que dice qué hacer.
+        const notasTxt = notas.slice(-3).map((n: any) =>
+          `**${n.quien ?? "Finance"}:** ${String(n.texto ?? "").slice(0, 280)}`).join("\n");
+        const cuerpo = {
+          content: mencion ? `${mencion} — ${v.emoji} **${a.cliente_nombre}**: ${v.txt}` : "",
+          allowed_mentions: { parse: ["users"] },
+          embeds: [{
+            title: `${v.emoji} ${a.cliente_nombre} — ${v.txt}`,
+            url: `https://saul-sketch.github.io/ar-app/${a.codigo}`,
+            description: `**${a.vendedor_nombre ?? "—"}** · ${fono(a.cliente_telefono)}\n${quéHacer}`,
+            color: v.color,
+            fields: notasTxt
+              ? [{ name: notas.length > 1 ? `Notas de Finance · ${notas.length}` : "Nota de Finance",
+                   value: notasTxt, inline: false }]
+              : [],
+            footer: { text: `Revisada por ${a.veredicto_por ?? quien}` },
+          }],
+        };
+        let vid = a.discord_msg_vend || null;
+        if (vid && !(await editarEnCanal(canal, vid, cuerpo))) vid = null;   // lo borraron
+        if (!vid) {
+          vid = await aCanal(canal, cuerpo);
+          if (vid) {
+            await fetch(`${SUPA}/rest/v1/rpc/ar_oa_discord_vend`, {
+              method: "POST", headers: { ...H, "Content-Type": "application/json" },
+              body: JSON.stringify({ p_id: a.id, p_msg: vid }),
+            }).catch(() => {});
+          }
+        }
       }
+    }
+    if (esNoticia) {
       await fetch(`${SUPA}/rest/v1/rpc/ar_oa_discord_aviso`, {
         method: "POST", headers: { ...H, "Content-Type": "application/json" },
         body: JSON.stringify({ p_id: a.id, p_v: a.veredicto }),

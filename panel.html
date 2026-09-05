@@ -883,7 +883,7 @@ function fila(a){
     <div class="top">
       <div>
         <div class="nom">${esc(a.cliente_nombre)}${a.deal_number ? ` <span class="deal">#${esc(a.deal_number)}</span>` : ''}</div>
-        <div class="linea"><span class="tel" onclick="copiarTel(event, this)" title="Toca para copiar · o selecciónalo con el mouse">${esc(tel(a.cliente_telefono))}</span> · ${esc(a.vendedor_nombre)}${a.location ? ' · ' + esc(a.location) : ''} · ${esc(cuandoRelativo(a.created_at))}</div>
+        <div class="linea"><span class="tel" onclick="copiarTel(event, this)" title="Toca para copiar · o selecciónalo con el mouse">${esc(tel(a.cliente_telefono))}</span> · ${esc(a.vendedor_nombre)}${a.location ? ' · ' + esc(a.location) : ''} · ${esc(cuandoRelativo(a.created_at))} <span class="cuando">${esc(fechaHora(a.created_at))}</span></div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         ${vieneHoy(a) ? `<span class="badge b-azul" style="font-size:12px">📍 VIENE HOY${a.visita_hora ? ' ' + esc(a.visita_hora) : ''}</span>` : ''}
