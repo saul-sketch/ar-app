@@ -18,6 +18,28 @@ const SVC  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const BUCKET = "ar-oa-docs";
 const MAX = 15 * 1024 * 1024;              // 15 MB, lo mismo que aguanta el de pólizas
 
+/* Qué se puede subir. Son documentos de un cliente: identificación, talones,
+   estados de cuenta. Nada mas.
+   Sin esta lista se podía subir un .html o un .svg, y como los archivos se abren
+   con un enlace del mismo dominio, ese archivo correría COMO SI FUERA la página —
+   podría leer lo que ve quien lo abre. El tipo se decide por la extensión del
+   nombre, no por lo que diga el navegador: eso ultimo lo escribe quien sube. */
+const TIPOS_OK: Record<string, string> = {
+  pdf: "application/pdf",
+  jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png",
+  heic: "image/heic", heif: "image/heif", webp: "image/webp",
+  gif: "image/gif", bmp: "image/bmp", tif: "image/tiff", tiff: "image/tiff",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  txt: "text/plain", csv: "text/csv",
+};
+function tipoSeguro(nombre: string): string | null {
+  const ext = String(nombre || "").toLowerCase().split(".").pop() || "";
+  return TIPOS_OK[ext] ?? null;
+}
+
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -51,7 +73,9 @@ Deno.serve(async (req) => {
 
     if (accion === "subir") {
       const nombre = String(body.nombre || "documento").slice(0, 140);
-      const tipo   = String(body.tipo || "application/octet-stream");
+      // El tipo lo decide la extensión, no lo que diga quien sube.
+      const tipo = tipoSeguro(nombre);
+      if (!tipo) return json({ error: "tipo_no_permitido" }, 415);
       const b64    = String(body.datos || "");
       if (!b64) return json({ error: "sin_archivo" }, 400);
       // El navegador manda el archivo en base64; ocupa ~4/3 de su tamaño real.
@@ -62,7 +86,11 @@ Deno.serve(async (req) => {
       const limpio = nombre.replace(/[^\w.\- ]+/g, "_");
       const ruta = `${id}/${docId}-${limpio}`;
       const up = await fetch(`${SUPA}/storage/v1/object/${BUCKET}/${ruta}`, {
-        method: "POST", headers: { ...H, "Content-Type": tipo, "x-upsert": "true" }, body: bin,
+        method: "POST",
+        headers: { ...H, "Content-Type": tipo, "x-upsert": "true",
+                   // Que el navegador lo BAJE en vez de abrirlo dentro del sitio.
+                   "Content-Disposition": `attachment; filename="${limpio}"` },
+        body: bin,
       });
       if (!up.ok) return json({ error: "no_subio", detalle: (await up.text()).slice(0, 200) }, 502);
 

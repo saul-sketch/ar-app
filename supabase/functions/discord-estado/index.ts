@@ -280,7 +280,7 @@ Deno.serve(async (req) => {
           embeds: [{
             title: `${v.emoji} ${a.cliente_nombre} — ${v.txt}`,
             url: `https://saul-sketch.github.io/ar-app/${a.codigo}`,
-            description: `**${a.vendedor_nombre ?? "—"}** · ${fono(a.cliente_telefono)}\n${quéHacer}`,
+            description: `**${a.cliente_nombre}**\n${quéHacer}`,
             color: v.color,
             fields: notasTxt
               ? [{ name: notas.length > 1 ? `Notas de Finance · ${notas.length}` : "Nota de Finance",
