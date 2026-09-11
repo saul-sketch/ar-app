@@ -893,15 +893,17 @@ function pintarKpis(){
       <div class="tabla-scroll">
         <table class="tabla">
           <thead><tr><th>Vendedor</th><th>${esc(etq)}</th><th>Total</th><th>Aprob.</th><th>Posib.</th><th>Neg.</th><th>Por traer</th><th>Vinieron</th><th>Vendidas</th><th>Conv.</th></tr></thead>
-          <tbody>${filas.map(f => {
+          <tbody>${(IRV.length = 0, filas.map(f => {
+            // El correo viene de afuera: nunca va escrito dentro del onclick, solo su índice.
+            const vi = IRV.push(f.email) - 1;
             // Cada número abre esas fichas de ese vendedor.
             const c = (n, color, o) => n
-              ? `<td><button class="celda" style="color:${color}" onclick='irA(${JSON.stringify(Object.assign({ vend: f.email }, o))})'>${n}</button></td>`
+              ? `<td><button class="celda" style="color:${color}" onclick='irA(Object.assign({ vend: IRV[${vi}] }, ${JSON.stringify(o)}))'>${n}</button></td>`
               : `<td style="color:var(--gray-300)">—</td>`;
             const conv = (f.apro + f.posi) ? Math.round(f.vend / (f.apro + f.posi) * 100) + '%' : '—';
             return `<tr>
-            <td class="nom2"><button class="celda nom" onclick='irA(${JSON.stringify({ vend: f.email })})'>${esc(f.nombre)}</button></td>
-            <td>${f.per ? `<button class="celda" onclick="irA({vend:'${f.email}',rango:${R('created_at')}})"><b>${f.per}</b></button>` : '—'}</td>
+            <td class="nom2"><button class="celda nom" onclick='irA({ vend: IRV[${vi}] })'>${esc(f.nombre)}</button></td>
+            <td>${f.per ? `<button class="celda" onclick="irA({vend:IRV[${vi}],rango:${R('created_at')}})"><b>${f.per}</b></button>` : '—'}</td>
             <td>${f.tot}</td>
             ${c(f.apro, 'var(--green)', { ver: 'aprobado' })}
             ${c(f.posi, 'var(--yellow)', { ver: 'posible' })}
@@ -909,7 +911,7 @@ function pintarKpis(){
             ${c(f.traer, 'var(--red)', { etapa: 'por_traer' })}
             ${c(f.vino, 'var(--blue)', { etapa: 'vino' })}
             ${c(f.vend, 'var(--green)', { etapa: 'vendida' })}
-            <td><b>${conv}</b></td></tr>`; }).join('')}</tbody>
+            <td><b>${conv}</b></td></tr>`; }).join(''))}</tbody>
         </table>
       </div>
     </div>
@@ -993,6 +995,7 @@ function pintarKpis(){
    Medido el 11-sep: de 22 aprobadas vinieron 11 y compraron 8; de 40 posibles
    vinieron 8 y compraron 2. Treinta y tres nunca vinieron, y no aparecían en
    ninguna pantalla. Esas son las que este bloque pone al frente. */
+const IRV = [];
 let DES = {}, ETAPA = 'todas', RANGO = null, SEG = null, MIAS = [], YO_EMAIL = '';
 
 const ETAPAS = {
