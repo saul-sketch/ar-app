@@ -67,7 +67,7 @@ async function descartadoEnCRM(cid: string): Promise<Cierre | null> {
   const e = await etapas();
   for (const o of j?.opportunities ?? []) {
     const st = e[o.pipelineStageId];
-    const nombre = st ? st.etapa.replace(/^[\d.\s]+/, "").replace(/[^\p{L}\p{N}, ]/gu, "").trim() : "";
+    const nombre = st ? st.etapa.replace(/^[\d.\s]+/, "").replace(/[^\p{L}\p{N}, ]/gu, " ").replace(/\s+/g, " ").trim() : "";
     const at = o.lastStageChangeAt || o.lastStatusChangeAt || o.updatedAt || "";
     const vendido = /vendido|sold/i.test(nombre) || (st && /sold deals/i.test(st.pipe));
     const nom2 = st && /sold deals/i.test(st.pipe) ? `vendido (${st.pipe.replace(/[^\p{L}\p{N} ]/gu, "").trim()} · ${nombre})` : nombre;
