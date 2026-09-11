@@ -47,7 +47,34 @@ async function ghl(url: string, v?: string): Promise<any> {
   }
   return null;
 }
-async function ultimoContacto(contactId: string | null, tel: string): Promise<{ fecha: string; tipo: string; quien: string } | null | undefined> {
+/* ¿El CRM ya lo descartó? Es la ÚNICA forma de salir de este reporte sin comprar
+   (Saúl, 11-sep): que la oportunidad esté en una etapa de cierre — compró en otro
+   lugar, vendido, lead muerto, no interesado, descalificado — o marcada perdida/ganada. */
+const CIERRE = /vendido|sold|compr[oó]|compraron|muerto|equivocado|desconectado|no (esta |está )?interesado|descalificado|stop/i;
+let ETAPAS: Promise<Record<string, { etapa: string; pipe: string }>> | null = null;
+function etapas() {
+  ETAPAS ??= (async () => {
+    const m: Record<string, { etapa: string; pipe: string }> = {};
+    const j = await ghl(`https://services.leadconnectorhq.com/opportunities/pipelines?locationId=${LOC}`, "2021-07-28");
+    for (const p of j?.pipelines ?? []) for (const st of p.stages ?? []) m[st.id] = { etapa: String(st.name), pipe: String(p.name) };
+    return m;
+  })();
+  return ETAPAS;
+}
+async function descartadoEnCRM(cid: string): Promise<string | null> {
+  const j = await ghl(`https://services.leadconnectorhq.com/opportunities/search?location_id=${LOC}&contact_id=${cid}`, "2021-07-28");
+  const e = await etapas();
+  for (const o of j?.opportunities ?? []) {
+    const st = e[o.pipelineStageId];
+    const nombre = st ? st.etapa.replace(/^[\d.\s]+/, "").replace(/[^\p{L}\p{N}, ]/gu, "").trim() : "";
+    if (o.status === "won") return "vendido";
+    if (o.status === "lost") return `marcado perdido en el CRM${nombre ? " (etapa: " + nombre + ")" : ""}`;
+    if (st && (/sold deals/i.test(st.pipe) || CIERRE.test(st.etapa))) return nombre;
+  }
+  return null;
+}
+
+async function ultimoContacto(contactId: string | null, tel: string): Promise<{ fecha: string; tipo: string; quien: string; fuera?: string } | null | undefined> {
   if (!GHL || !LOC) return undefined;
   let cid = contactId;
   if (!cid && tel.length === 10) {
@@ -55,6 +82,8 @@ async function ultimoContacto(contactId: string | null, tel: string): Promise<{ 
     cid = j?.contact?.id ?? null;
   }
   if (!cid) return undefined;                       // no está en el CRM
+  const fuera = await descartadoEnCRM(cid);
+  if (fuera) return { fecha: "", tipo: "", quien: "", fuera };
   const conv = await ghl(`https://services.leadconnectorhq.com/conversations/search?locationId=${LOC}&contactId=${cid}`);
   let mejor: any = null;
   for (const c of conv?.conversations ?? []) {
@@ -79,13 +108,13 @@ const CANAL_EQUIPO: Record<string, string> = {
 /* Managers que se mencionan en cada canal (Saúl, 11-sep):
    Kissimmee → Andrés, Víctor, Charles, Saúl · Orlando → Joseph, Charles, Saúl
    Call center → Freddy, los tres managers de tienda (Andrés, Víctor, Joseph) y Saúl.
-   Charles tiene dos cuentas en Discord; se mencionan las dos para que le llegue. */
+   Charles tiene dos cuentas; la buena es "Charles" (la que escribe en #ready-to-rumble). */
 const M = { andres: "1534302115726495897", victor: "1467914951707590920", joseph: "1529601872569172038",
             charles1: "1468206071133900915", charles2: "1468725255924351177",
             freddy: "1524767884369465477", saul: "1242195465760542723" };
 const MANAGERS: Record<string, string[]> = {
-  "1468208867086307359": [M.andres, M.victor, M.charles1, M.charles2, M.saul],   // Kissimmee
-  "1468209039685976075": [M.joseph, M.charles1, M.charles2, M.saul],             // Orlando
+  "1468208867086307359": [M.andres, M.victor, M.charles1, M.saul],   // Kissimmee
+  "1468209039685976075": [M.joseph, M.charles1, M.saul],             // Orlando
   "1467924390657261579": [M.freddy, M.andres, M.victor, M.joseph, M.saul],       // call center
 };
 const CANAL_TIENDA: Record<string, string> = {
@@ -166,7 +195,7 @@ Deno.serve(async (req) => {
     const r = await fetch(`${SUPA}/rest/v1/rpc/ar_oa_pendientes_por_vender`, {
       method: "POST", headers: { ...H, "Content-Type": "application/json" }, body: "{}",
     });
-    const filas = await r.json();
+    let filas = await r.json();
     if (!Array.isArray(filas)) return json({ ok: false, motivo: "no_se_pudo_leer", detalle: filas }, 500);
     if (!filas.length) return json({ ok: true, enviados: 0 });
 
@@ -176,6 +205,9 @@ Deno.serve(async (req) => {
         a.ult = await ultimoContacto(a.crm_contact_id, a.telefono || "");
       }));
     }
+    // Los que el CRM ya descartó salen del reporte; se cuentan al final para que se sepa.
+    const descartados = filas.filter((a: any) => a.ult?.fuera);
+    filas = filas.filter((a: any) => !a.ult?.fuera);
     // canal → vendedor → fichas
     const porCanal: Record<string, Record<string, any[]>> = {};
     for (const a of filas) {
@@ -215,7 +247,8 @@ Deno.serve(async (req) => {
       }
       if (await publicar(canal, msg)) enviados.push(canal);
     }
-    return json({ ok: true, pendientes: filas.length, mensajes: enviados.length, vista: VISTA });
+    return json({ ok: true, pendientes: filas.length, mensajes: enviados.length, vista: VISTA,
+                  descartados: descartados.map((a: any) => `${a.cliente_nombre} (${a.vendedor_nombre}): ${a.ult.fuera}`) });
   } catch (e) {
     return json({ ok: false, error: String(e) }, 500);
   }

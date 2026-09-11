@@ -22,7 +22,8 @@ language sql stable security definer set search_path to 'public' as $$
          right(regexp_replace(coalesce(a.cliente_telefono, ''), '\D', '', 'g'), 10)
     from public.ar_online_applications a
     join public.ar_oa_desenlaces_todas() d on d.id = a.id
-   where a.borrada_at is null and a.perdida_at is null
+   -- Marcarla perdida en el panel NO la saca: solo el CRM (etapa de cierre) o una venta.
+   where a.borrada_at is null
      and a.veredicto in ('aprobado', 'posible')
      and not d.vendida and not d.compro_antes
    order by a.vendedor_nombre, a.veredicto_at
