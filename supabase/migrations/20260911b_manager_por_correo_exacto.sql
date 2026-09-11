@@ -7,7 +7,7 @@ update public.ar_oa_usuarios set email = v.email from (values
   ('Victor','vppaul89@gmail.com')) v(nombre,email)
  where ar_oa_usuarios.nombre = v.nombre and ar_oa_usuarios.nivel = 'manager' and ar_oa_usuarios.email is null;
 
-update public.ar_oa_usuarios set emails_alt = array['saullozanoo@gmail.com','saul@auto-republic.com']
+update public.ar_oa_usuarios set emails_alt = array['saul@smartwavedigital.io','saullozanoo@gmail.com','saul@auto-republic.com']
  where nombre = 'Saul' and nivel = 'manager';
 
 create or replace function public.ar_oa_quien_crm(p_email text, p_nombre text)
