@@ -76,6 +76,18 @@ const CANAL_EQUIPO: Record<string, string> = {
   "closers-orlando":   "1468209039685976075",   // #sales-team-orlando
   "closers-kissimmee": "1468208867086307359",   // #sales-team-kissimmee
 };
+/* Managers que se mencionan en cada canal (Saúl, 11-sep):
+   Kissimmee → Andrés, Víctor, Charles, Saúl · Orlando → Joseph, Charles, Saúl
+   Call center → Freddy, los tres managers de tienda (Andrés, Víctor, Joseph) y Saúl.
+   Charles tiene dos cuentas en Discord; se mencionan las dos para que le llegue. */
+const M = { andres: "1534302115726495897", victor: "1467914951707590920", joseph: "1529601872569172038",
+            charles1: "1468206071133900915", charles2: "1468725255924351177",
+            freddy: "1524767884369465477", saul: "1242195465760542723" };
+const MANAGERS: Record<string, string[]> = {
+  "1468208867086307359": [M.andres, M.victor, M.charles1, M.charles2, M.saul],   // Kissimmee
+  "1468209039685976075": [M.joseph, M.charles1, M.charles2, M.saul],             // Orlando
+  "1467924390657261579": [M.freddy, M.andres, M.victor, M.joseph, M.saul],       // call center
+};
 const CANAL_TIENDA: Record<string, string> = {
   "orlando":   "1468209039685976075",
   "kissimmee": "1468208867086307359",
@@ -195,7 +207,8 @@ Deno.serve(async (req) => {
         bloques.push(`${men ?? `**${vend}**`} (${lista.length})\n${lineas.join("\n")}`);
       }
       // Discord corta a 2000 caracteres: se parte por vendedor, nunca a mitad de uno.
-      let msg = titulo;
+      const cc = (MANAGERS[canal] ?? []).map((id) => `<@${id}>`).join(" ");
+      let msg = titulo + (cc ? `\nManagers: ${cc}` : "");
       for (const b of bloques) {
         if ((msg + "\n\n" + b).length > 1900) { if (await publicar(canal, msg)) enviados.push(canal); msg = b; }
         else msg += "\n\n" + b;
