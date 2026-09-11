@@ -252,7 +252,12 @@ Deno.serve(async (req) => {
           if (a.ult === undefined) ult = "❔ no está en el CRM, no se puede saber";
           else if (a.ult === null || a.ult.fecha < a.veredicto_at) ult = `⚠️ nadie lo ha contactado desde que se aprobó (${hace(a.veredicto_at)})`;
           else ult = `último contacto ${hace(a.ult.fecha)} · ${a.ult.tipo}${a.ult.quien ? " de " + a.ult.quien : ""}`;
-          if (a.choque) ult += `\n  └ 🚨 en el CRM está como «${a.choque.motivo}» desde el ${corta(diaNY(a.choque.at))}, pero Finance la aprobó después. Revisar y moverla en el CRM`;
+          if (a.choque) {
+            // Lo que el vendedor tiene que entender: el CRM dice que ya no va, pero Finance lo acaba de aprobar.
+            const q = /^marcada perdida/.test(a.choque.motivo) ? "como perdido"
+                    : a.choque.tipo === "vendido" ? "como que ya compró con nosotros" : `como «${a.choque.motivo}»`;
+            ult += `\n  └ 🚨 Ojo: en el CRM está cerrado ${q} desde el ${corta(diaNY(a.choque.at))}, pero Finance lo aprobó el ${corta(diaNY(a.veredicto_at))}. Si el cliente sigue interesado, reactívenlo en el CRM.`;
+          }
           return `• **${nom}**${era} — ${que} el ${cuando(a.veredicto_at)}${a.vino ? " · vino, no compró" : ""}\n  └ ${ult}`;
         });
         bloques.push(`${men ?? `**${vend}**`} (${lista.length})\n${lineas.join("\n")}`);
