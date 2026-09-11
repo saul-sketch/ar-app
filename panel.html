@@ -47,6 +47,8 @@
   .lnk.quitar{color:var(--blue);font-weight:600;}
   .filtro-etapa{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#eff6ff;border-radius:10px;
        padding:9px 12px;margin:0 0 12px;font-size:13px;color:#1e40af;}
+  .filtro-etapa .fe-b{display:flex;gap:14px;flex-wrap:wrap;justify-content:flex-end}
+  .emb-tit{font-size:12px;color:var(--gray-500);margin:0 0 6px 2px;font-weight:600}
   .filtro-etapa button{background:none;border:0;color:#1e40af;font-weight:700;cursor:pointer;font-size:13px;font-family:inherit;white-space:nowrap;}
 
   .paso{margin-top:10px;font-size:13px;font-weight:600;color:var(--gray-700);background:var(--gray-100);border-radius:8px;padding:8px 11px;}
@@ -91,6 +93,14 @@
   .emb-per .l{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-500);margin-top:6px;}
   .emb-per .flecha{display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--gray-300);font-size:14px;min-width:34px;}
   .emb-per .flecha span{font-size:11px;font-weight:700;color:var(--gray-500);}
+  /* En el iPhone no cabe en una fila: se ve en columna, cada flecha con su % en medio. */
+  @media(max-width:560px){
+    .emb-per{flex-direction:column;overflow:visible;gap:2px;}
+    .emb-per button{display:flex;align-items:baseline;gap:10px;min-width:0;padding:10px 12px;}
+    .emb-per .l{margin-top:0;}
+    .emb-per .flecha{flex-direction:row;gap:6px;min-width:0;font-size:12px;padding:1px 0;}
+    .emb-per .flecha{transform:none;}
+  }
 
   .riesgo{display:flex;flex-direction:column;gap:6px;}
   .riesgo-f{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;border:1.5px solid var(--gray-200);
@@ -348,13 +358,14 @@
           </div>
         </div>
         <div class="frow">
-          <span class="ftit">Etapa</span>
+          <span class="ftit">Paso</span>
           <div class="fchips">
             <button class="chip on" data-f="todas">Todas</button>
-            <button class="chip" data-f="hoy">Compran ya</button>
-            <button class="chip" data-f="trabajando">Trabajándolas</button>
-            <button class="chip" data-f="esperando">Esperando</button>
-            <button class="chip" data-f="cerrada">Cerradas</button>
+            <button class="chip" data-f="e:apro_sin_venir">Aprobadas sin venir</button>
+            <button class="chip" data-f="e:posi_sin_venir">Posibles sin venir</button>
+            <button class="chip" data-f="e:vino">Vinieron, no compraron</button>
+            <button class="chip" data-f="e:vendida">Compraron</button>
+            <button class="chip" data-f="e:perdida">Perdidas</button>
             <button class="chip" data-f="sincopia">Sin copia ✉</button>
           </div>
         </div>
@@ -473,7 +484,7 @@ function ocupado(){
 function huella(filas){
   return filas.map(a => [a.id, a.estado, a.veredicto, a.deal_number, a.fico, a.fico_co, a.fico_txt, a.fico_co_txt, (a.docs||[]).length,
     (a.bitacora||[]).length, a.copia_estado, a.crm_contact_id, a.perdida_at, a.proximo_contacto,
-    (DES[a.id]||{}).vino_fecha, (DES[a.id]||{}).vendida].join('~')).join('|');
+    (DES[a.id]||{}).vino_fecha, (DES[a.id]||{}).vendida, (DES[a.id]||{}).mismo_dia, (DES[a.id]||{}).antes, a.ultimo_contacto_at].join('~')).join('|') + (DES_MAL ? '!' : '');
 }
 
 /* Redibujar sin sacarlo de donde estaba: se guarda a que altura esta y se devuelve
@@ -497,11 +508,15 @@ function pintarSinMover(){
 
 async function refrescar(silencioso){
   if (!CODIGO) return;
-  const filas = await rpc('ar_oa_todas', { p_codigo: CODIGO }).catch(() => null);
+  const antes = huella(TODAS);
+  const [filas] = await Promise.all([
+    rpc('ar_oa_todas', { p_codigo: CODIGO }).catch(() => null),
+    cargarDesenlaces((CRM && CRM.email) || null),
+  ]);
   if (!Array.isArray(filas)) return;
   ULTIMA = Date.now();
   // Nada cambio: no se toca la pantalla. Es el caso mas comun.
-  if (huella(filas) === huella(TODAS)){ TODAS = filas; PENDIENTE = null; return; }
+  if (huella(filas) === antes){ TODAS = filas; PENDIENTE = null; return; }
   if (!silencioso || !ocupado()){
     TODAS = filas; PENDIENTE = null;
     const av = document.getElementById('aviso-nuevas'); if (av) av.remove();
@@ -702,7 +717,8 @@ function visibles(){
     // La etapa del embudo (por traer, vino, vendida...) y el rango de fechas que
     // viene de hacer clic en un número de los KPIs.
     if (ETAPA === 'hoy_toca' && !meToca(a)) return false;
-    if (ETAPA !== 'todas' && ETAPA !== 'hoy_toca' && etapa(a) !== ETAPA) return false;
+    if (LISTAS[ETAPA] && !LISTAS[ETAPA].f(a)) return false;
+    if (ETAPA !== 'todas' && ETAPA !== 'hoy_toca' && !LISTAS[ETAPA] && etapa(a) !== ETAPA) return false;
     if (RANGO && !enRango(a[RANGO.campo], RANGO.a, RANGO.b)) return false;
     // Veredicto y etapa son ejes distintos: se cruzan, no se pisan.
     if (VER === 'sinrevisar' && a.veredicto) return false;
@@ -806,10 +822,9 @@ function pintarKpis(){
     if (enRango(x.created_at, a, b)) o.per++;
     if (x.veredicto) { o.rev++; if (x.veredicto==='aprobado') o.apro++; if (x.veredicto==='posible') o.posi++; if (x.veredicto==='negado') o.nega++; }
     else o.sin++;
-    const et2 = etapa(x);
-    if (et2 === 'por_traer') o.traer++;
-    if (et2 === 'vino') o.vino++;
-    if (et2 === 'vendida') o.vend++;
+    if (etapa(x) === 'por_traer') o.traer++;
+    if (laTrajo(x)) o.vino++;
+    if (laCompro(x)) o.vend++;
   });
   const filas = Object.values(porV).sort((p,q) => q.per - p.per || q.tot - p.tot);
   const lider = filas.filter(f => f.per > 0)[0];
@@ -820,13 +835,15 @@ function pintarKpis(){
     ? `<button class="kpi kpi-clic" onclick="${clic}"><div class="n" ${color?`style="color:${color}"`:''}>${n}</div><div class="l">${esc(l)}</div>${sub?`<div class="kpi-sub">${esc(sub)}</div>`:''}<div class="kpi-ver">Ver →</div></button>`
     : `<div class="kpi"><div class="n" ${color?`style="color:${color}"`:''}>${n}</div><div class="l">${esc(l)}</div>${sub?`<div class="kpi-sub">${esc(sub)}</div>`:''}</div>`;
   const R = campo => KPI_PER === 'todo' ? 'null' : `rangoKpi('${campo}')`;
-  // El embudo del período: de lo que entró, cuánto se aprobó, cuánto vino, cuánto compró.
-  const perRec = recibidas;
-  const perPos = perRec.filter(x => x.veredicto === 'aprobado' || x.veredicto === 'posible');
-  const perVino = perRec.filter(x => ['vino','vendida'].includes(etapa(x)));
-  const perVend = perRec.filter(x => etapa(x) === 'vendida');
+  // El embudo del período, contado por el día en que Finance la REVISÓ: de las que se
+  // revisaron, cuántas salieron buenas, cuántas vinieron DESPUÉS y cuántas compraron.
+  const perRev = revisadas.filter(x => x.veredicto !== 'historico');
+  const perPos = perRev.filter(esAP);
+  const perVino = perPos.filter(laTrajo);
+  const perVend = perPos.filter(laCompro);
+  const perYa = perPos.filter(LISTAS.kpi_yaestaba.f);
   const pct = (p, q) => q ? Math.round(p / q * 100) + '%' : '—';
-  const enRiesgo = base.filter(x => etapa(x) === 'por_traer' && diasPorTraer(x) >= 3)
+  const enRiesgo = base.filter(x => etapa(x) === 'por_traer' && diasPorTraer(x) >= 3 && !(x.proximo_contacto && x.proximo_contacto >= hoyFL()))
                        .sort((p, q) => diasPorTraer(q) - diasPorTraer(p));
 
   document.getElementById('kpi-vista').innerHTML = `
@@ -837,17 +854,19 @@ function pintarKpis(){
     </div>
 
     <div class="sect2" style="margin-top:4px">
-      <h3>El embudo · ${esc(etq.toLowerCase())}</h3>
-      <div class="kpi-hint">De las aplicaciones que entraron en ${esc(etq.toLowerCase())}: cuántas salieron aprobadas o con posibilidad, cuántas vinieron al dealer y cuántas compraron. <b>Vino</b> y <b>compró</b> se detectan solos, cruzando el teléfono con el reporte diario.</div>
+      <h3>¿La aplicación trae clientes? · revisadas ${esc(etq.toLowerCase())}</h3>
+      <div class="kpi-hint">Cuenta las aplicaciones que Finance revisó en ${esc(etq.toLowerCase())}. <b>Vinieron</b> y <b>compraron</b> solo cuentan si pasó <b>después</b> del día de la revisión, según el reporte diario de visitas. Si el cliente ya estaba en el dealer ese día, no se cuenta como traído por la aplicación.</div>
       <div class="emb-per">
-        <button onclick="irA({rango:${R('created_at')}})"><div class="n">${perRec.length}</div><div class="l">Entraron</div></button>
-        <div class="flecha">→<span>${pct(perPos.length, perRec.length)}</span></div>
-        <button onclick="irA({etapa:'por_traer',rango:${R('created_at')}})" class="${perPos.length?'':'vacio'}"><div class="n" style="color:var(--green)">${perPos.length}</div><div class="l">Aprob. + posibles</div></button>
+        <button onclick="irA({etapa:'kpi_rev',rango:${R('veredicto_at')}})"><div class="n">${perRev.length}</div><div class="l">Revisadas</div></button>
+        <div class="flecha">→<span>${pct(perPos.length, perRev.length)}</span></div>
+        <button onclick="irA({etapa:'kpi_ap',rango:${R('veredicto_at')}})" class="${perPos.length?'':'vacio'}"><div class="n" style="color:var(--green)">${perPos.length}</div><div class="l">Aprob. + posibles</div></button>
         <div class="flecha">→<span>${pct(perVino.length, perPos.length)}</span></div>
-        <button onclick="irA({etapa:'vino',rango:${R('created_at')}})"><div class="n" style="color:var(--blue)">${perVino.length}</div><div class="l">Vinieron</div></button>
+        <button onclick="irA({etapa:'kpi_trajo',rango:${R('veredicto_at')}})"><div class="n" style="color:var(--blue)">${perVino.length}</div><div class="l">Vinieron después</div></button>
         <div class="flecha">→<span>${pct(perVend.length, perVino.length)}</span></div>
-        <button onclick="irA({etapa:'vendida',rango:${R('created_at')}})"><div class="n" style="color:var(--green)">${perVend.length}</div><div class="l">Compraron</div></button>
+        <button onclick="irA({etapa:'kpi_compro',rango:${R('veredicto_at')}})"><div class="n" style="color:var(--green)">${perVend.length}</div><div class="l">Compraron</div></button>
       </div>
+      <div class="kpi-hint" style="margin-top:8px">${perPos.length ? `En palabras: de <b>${perPos.length}</b> aprobadas o posibles, vinieron <b>${perVino.length}</b> y compraron <b>${perVend.length}</b>.` : ''}
+        ${perYa.length ? ` Aparte, <button class="lnk" style="display:inline;padding:0" onclick="irA({etapa:'kpi_yaestaba',rango:${R('veredicto_at')}})"><b>${perYa.length}</b> ya estaban en el dealer</button> cuando se revisaron.` : ''}</div>
     </div>
 
     ${enRiesgo.length ? `
@@ -892,7 +911,7 @@ function pintarKpis(){
       <div class="kpi-hint">${lider ? `<b>${esc(lider.nombre)}</b> va de primero — ${lider.per} en ${etq.toLowerCase()}.` : `Nadie ha enviado en ${etq.toLowerCase()}.`}</div>
       <div class="tabla-scroll">
         <table class="tabla">
-          <thead><tr><th>Vendedor</th><th>${esc(etq)}</th><th>Total</th><th>Aprob.</th><th>Posib.</th><th>Neg.</th><th>Por traer</th><th>Vinieron</th><th>Vendidas</th><th>Conv.</th></tr></thead>
+          <thead><tr><th>Vendedor</th><th>${esc(etq)}</th><th>Total</th><th>Aprob.</th><th>Posib.</th><th>Neg.</th><th>Sin venir</th><th>Vinieron después</th><th>Compraron</th><th>% compró</th></tr></thead>
           <tbody>${(IRV.length = 0, filas.map(f => {
             // El correo viene de afuera: nunca va escrito dentro del onclick, solo su índice.
             const vi = IRV.push(f.email) - 1;
@@ -909,8 +928,8 @@ function pintarKpis(){
             ${c(f.posi, 'var(--yellow)', { ver: 'posible' })}
             ${c(f.nega, 'var(--red)', { ver: 'negado' })}
             ${c(f.traer, 'var(--red)', { etapa: 'por_traer' })}
-            ${c(f.vino, 'var(--blue)', { etapa: 'vino' })}
-            ${c(f.vend, 'var(--green)', { etapa: 'vendida' })}
+            ${c(f.vino, 'var(--blue)', { etapa: 'kpi_trajo' })}
+            ${c(f.vend, 'var(--green)', { etapa: 'kpi_compro' })}
             <td><b>${conv}</b></td></tr>`; }).join(''))}</tbody>
         </table>
       </div>
@@ -996,28 +1015,47 @@ function pintarKpis(){
    vinieron 8 y compraron 2. Treinta y tres nunca vinieron, y no aparecían en
    ninguna pantalla. Esas son las que este bloque pone al frente. */
 const IRV = [];
-let DES = {}, ETAPA = 'todas', RANGO = null, SEG = null, MIAS = [], YO_EMAIL = '';
+let DES_MAL = false, DES = {}, ETAPA = 'todas', RANGO = null, SEG = null, MIAS = [], YO_EMAIL = '';
 
 const ETAPAS = {
   sin_revisar: { t: 'Sin revisar',      c: 'ambar', dueno: 'Finance' },
-  por_traer:   { t: 'Por traer',        c: 'rojo',  dueno: 'el vendedor' },
-  vino:        { t: 'Vinieron',         c: 'azul',  dueno: 'el closer' },
-  vendida:     { t: 'Vendidas',         c: 'verde', dueno: '' },
+  por_traer:   { t: 'Sin venir',        c: 'rojo',  dueno: 'el vendedor' },
+  vino:        { t: 'Vinieron, no compraron', c: 'azul', dueno: 'el closer' },
+  vendida:     { t: 'Compraron',        c: 'verde', dueno: '' },
   negada:      { t: 'Negadas',          c: 'gris',  dueno: '' },
   perdida:     { t: 'Perdidas',         c: 'gris',  dueno: '' },
   historico:   { t: 'Históricas',       c: 'gris',  dueno: '' },
 };
 
+/* Dos preguntas distintas, dos respuestas distintas:
+   - Para TRABAJAR la lista, cualquier visita cuenta: si ya estuvo en el dealer, ya no
+     está "sin venir", aunque haya sido el mismo día que aplicó.
+   - Para MEDIR si la aplicación trajo al cliente, solo cuenta lo que pasó DESPUÉS del
+     día en que Finance la revisó (laTrajo / laCompro). El mismo día casi siempre es
+     alguien que ya estaba sentado en el dealer. */
 function etapa(a){
   const d = DES[a.id] || {};
-  if (d.vendida) return 'vendida';
+  if (d.vendida || d.compro_antes) return 'vendida';
   if (a.perdida_at) return 'perdida';
-  if (d.vino_fecha) return 'vino';
   if (a.veredicto === 'historico') return 'historico';
   if (a.veredicto === 'negado') return 'negada';
-  if (a.veredicto === 'aprobado' || a.veredicto === 'posible') return 'por_traer';
+  if (a.veredicto === 'aprobado' || a.veredicto === 'posible')
+    return (d.vino_fecha || d.mismo_dia || d.antes) ? 'vino' : 'por_traer';
   return 'sin_revisar';
 }
+const esAP = a => a.veredicto === 'aprobado' || a.veredicto === 'posible';
+const laTrajo = a => esAP(a) && !!(DES[a.id] || {}).vino_fecha;
+const laCompro = a => esAP(a) && !!(DES[a.id] || {}).vendida;
+// Listas que no son una sola etapa. El número y la lista usan la MISMA regla.
+const LISTAS = {
+  apro_sin_venir: { t: 'Aprobadas sin venir',   f: a => a.veredicto === 'aprobado' && etapa(a) === 'por_traer' },
+  posi_sin_venir: { t: 'Posibles sin venir',    f: a => a.veredicto === 'posible' && etapa(a) === 'por_traer' },
+  kpi_rev:        { t: 'Revisadas',             f: a => ['aprobado','posible','negado'].includes(a.veredicto) },
+  kpi_ap:         { t: 'Aprobadas y posibles',  f: esAP },
+  kpi_trajo:      { t: 'Vinieron después de revisada', f: laTrajo },
+  kpi_compro:     { t: 'Compraron después de revisada', f: laCompro },
+  kpi_yaestaba:   { t: 'Ya estaban en el dealer', f: a => esAP(a) && !laTrajo(a) && !!((DES[a.id]||{}).mismo_dia || (DES[a.id]||{}).antes) },
+};
 const hoyFL = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
 const fCorta = iso => { if (!iso) return ''; const p = String(iso).slice(0, 10).split('-'); return `${+p[2]}/${+p[1]}`; };
 const sumarDias = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); };
@@ -1032,12 +1070,15 @@ function diasPorTraer(a){
 function meToca(a){
   if (etapa(a) !== 'por_traer') return false;
   if (a.proximo_contacto) return a.proximo_contacto <= hoyFL();
+  // "Hablé con él — sin fecha": no vuelve a tocar hasta 3 días después.
+  if (a.ultimo_contacto_at) return Date.now() - new Date(a.ultimo_contacto_at) > 3 * 864e5;
   return true;
 }
 
 async function cargarDesenlaces(email){
   const r = await rpc('ar_oa_desenlaces', { p_codigo: CODIGO || null, p_email: email || null }).catch(() => null);
-  if (!Array.isArray(r)) return false;
+  DES_MAL = !Array.isArray(r);
+  if (DES_MAL) return false;
   const nuevo = {}; r.forEach(d => { nuevo[d.id] = d; }); DES = nuevo;
   return true;
 }
@@ -1047,31 +1088,54 @@ async function cargarDesenlaces(email){
 function embudoHTML(base){
   const c = {}; Object.keys(ETAPAS).forEach(k => c[k] = 0);
   base.forEach(a => { c[etapa(a)]++; });
+  const n = k => base.filter(LISTAS[k].f);
+  const apro = n('apro_sin_venir'), posi = n('posi_sin_venir');
   const toca = base.filter(meToca).length;
-  const cerrables = base.filter(a => a.veredicto === 'aprobado' || a.veredicto === 'posible').length;
   const sinRev = base.filter(a => !a.veredicto);
   const vieja = sinRev.length ? Math.round(Math.max(...sinRev.map(horasEsperando))) : 0;
-  const t = (k, n, sub, color, extra) => `
+  const fria = arr => arr.length ? `la más fría: ${Math.max(...arr.map(diasPorTraer))} días` : 'ninguna ✓';
+  const t = (k, num, titulo, sub, color, extra) => `
     <button class="emb ${ETAPA === k ? 'on' : ''} ${extra || ''}" onclick="irA({etapa:'${k}'})">
-      <div class="emb-n" ${color ? `style="color:${color}"` : ''}>${n}</div>
-      <div class="emb-l">${ETAPAS[k] ? ETAPAS[k].t : k}</div>
+      <div class="emb-n" ${color ? `style="color:${color}"` : ''}>${num}</div>
+      <div class="emb-l">${titulo}</div>
       ${sub ? `<div class="emb-s">${sub}</div>` : ''}
     </button>`;
   return `
+    <div class="emb-tit">Hoy, sin importar la fecha en que aplicaron</div>
     <div class="embudo">
-      ${t('sin_revisar', c.sin_revisar, c.sin_revisar ? `la más vieja ${vieja < 48 ? vieja + ' h' : Math.round(vieja / 24) + ' días'}` : 'al día ✓',
+      ${t('apro_sin_venir', apro.length, 'Aprobadas sin venir', fria(apro), apro.length ? 'var(--red)' : 'var(--green)', apro.length ? 'caliente' : '')}
+      ${t('posi_sin_venir', posi.length, 'Posibles sin venir', fria(posi), posi.length ? 'var(--yellow)' : null)}
+      ${t('vino', c.vino, 'Vinieron, no compraron', 'hay que cerrarlas', c.vino ? 'var(--blue)' : null)}
+      ${t('sin_revisar', c.sin_revisar, 'Sin revisar', c.sin_revisar ? `la más vieja ${vieja < 48 ? vieja + ' h' : Math.round(vieja / 24) + ' días'}` : 'al día ✓',
           c.sin_revisar ? 'var(--yellow)' : 'var(--green)')}
-      ${t('por_traer', c.por_traer, toca ? `<b>${toca}</b> te tocan hoy` : 'nadie pendiente hoy',
-          c.por_traer ? 'var(--red)' : null, c.por_traer ? 'caliente' : '')}
-      ${t('vino', c.vino, 'vinieron y no compraron', c.vino ? 'var(--blue)' : null)}
-      ${t('vendida', c.vendida, cerrables ? `${Math.round(c.vendida / cerrables * 100)}% de las aprobadas y posibles` : '', c.vendida ? 'var(--green)' : null)}
     </div>
     <div class="emb-otros">
-      <button class="lnk ${ETAPA === 'hoy_toca' ? 'on' : ''}" onclick="irA({etapa:'hoy_toca'})">📞 Me tocan hoy <b>${toca}</b></button>
-      <button class="lnk ${ETAPA === 'negada' ? 'on' : ''}" onclick="irA({etapa:'negada'})">Negadas <b>${c.negada}</b></button>
+      <button class="lnk ${ETAPA === 'hoy_toca' ? 'on' : ''}" onclick="irA({etapa:'hoy_toca'})">📞 Toca llamar hoy <b>${toca}</b></button>
+      <button class="lnk ${ETAPA === 'vendida' ? 'on' : ''}" onclick="irA({etapa:'vendida'})">Ya compraron <b>${c.vendida}</b></button>
       <button class="lnk ${ETAPA === 'perdida' ? 'on' : ''}" onclick="irA({etapa:'perdida'})">Perdidas <b>${c.perdida}</b></button>
-      ${ETAPA !== 'todas' ? `<button class="lnk quitar" onclick="irA({})">Ver todas ✕</button>` : ''}
+      <button class="lnk ${ETAPA === 'negada' ? 'on' : ''}" onclick="irA({etapa:'negada'})">Negadas <b>${c.negada}</b></button>
     </div>`;
+}
+
+/* Los nombres de la lista que se está viendo, agrupados por vendedor, listos para
+   pegar en el chat del equipo. Solo nombre y días: el teléfono no sale de aquí. */
+function copiarLista(){
+  const v = visibles();
+  const porV = {};
+  v.forEach(a => { (porV[a.vendedor_nombre || 'Sin vendedor'] = porV[a.vendedor_nombre || 'Sin vendedor'] || []).push(a); });
+  const bloques = Object.keys(porV).sort().map(k => `*${k}* (${porV[k].length})\n` +
+    porV[k].sort((x, y) => diasPorTraer(y) - diasPorTraer(x))
+      .map(a => `• ${a.cliente_nombre}${esAP(a) ? ' — ' + diasPorTraer(a) + (diasPorTraer(a) === 1 ? ' día' : ' días') : ''}`).join('\n'));
+  const txt = `*${etiquetaFiltroEtapa() || 'Aplicaciones'} — ${v.length}*\nFavor darle seguimiento hoy:\n\n` + bloques.join('\n\n');
+  const listo = () => avisito(`Copiados ${v.length} nombres — pégalos en el chat del equipo`);
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(listo, () => copiarViejo(txt, listo));
+  else copiarViejo(txt, listo);
+}
+function copiarViejo(txt, listo){
+  const t = document.createElement('textarea'); t.value = txt; t.style.position = 'fixed'; t.style.opacity = '0';
+  document.body.appendChild(t); t.select();
+  try { document.execCommand('copy'); listo(); } catch(e) { avisito('No se pudo copiar', true); }
+  t.remove();
 }
 
 /* De un número a la lista. Cuando el número viene de un período ("aprobadas hoy:
@@ -1102,7 +1166,7 @@ function etiquetaFiltroEtapa(){
   if (VER === 'sinrevisar') partes.push('sin revisar');
   else if (['aprobado','posible','negado'].includes(VER)) partes.push({ aprobado: 'aprobadas', posible: 'con posibilidad', negado: 'negadas' }[VER]);
   if (ETAPA === 'hoy_toca') partes.push('me tocan hoy');
-  else if (ETAPA !== 'todas') partes.push((ETAPAS[ETAPA] ? ETAPAS[ETAPA].t : ETAPA).toLowerCase());
+  else if (ETAPA !== 'todas') partes.push((LISTAS[ETAPA] || ETAPAS[ETAPA] || { t: ETAPA }).t.toLowerCase());
   if (RANGO) partes.push(RANGO.etq);
   const t = partes.join(' · ');
   return t ? t.charAt(0).toUpperCase() + t.slice(1) : '';
@@ -1110,13 +1174,15 @@ function etiquetaFiltroEtapa(){
 
 function etiquetaEtapa(a){
   const e = etapa(a), d = DES[a.id] || {};
-  if (e === 'vendida') return `<span class="badge b-verde">✓ Vendida ${fCorta(d.vendida_fecha)}${d.vendida_deal ? ' · #' + esc(d.vendida_deal) : ''}</span>`;
-  if (e === 'vino') return `<span class="badge b-azul" title="apareció en el reporte diario">Vino ${fCorta(d.vino_fecha)}${d.vino_closer ? ' · ' + esc(String(d.vino_closer).split(' ')[0]) : ''}</span>`;
+  if (e === 'vendida') return `<span class="badge b-verde">✓ Compró ${fCorta(d.vendida_fecha)}${d.vendida_deal ? ' · #' + esc(d.vendida_deal) : ''}</span>`;
+  if (e === 'vino') return d.vino_fecha
+    ? `<span class="badge b-azul" title="apareció en el reporte diario después de revisada">Vino ${fCorta(d.vino_fecha)}${d.vino_closer ? ' · ' + esc(String(d.vino_closer).split(' ')[0]) : ''} · no compró</span>`
+    : `<span class="badge b-azul" title="la visita es del mismo día de la revisión o de antes">Ya estaba en el dealer ${fCorta(d.mismo_dia || d.antes)} · no compró</span>`;
   if (e === 'perdida') return `<span class="badge b-gris">✕ Perdida</span>`;
   if (e === 'por_traer'){
     const n = diasPorTraer(a);
     const c = n >= 4 ? 'rojo' : n >= 2 ? 'ambar' : 'gris';
-    return `<span class="badge b-${c}" title="días desde que Finance la revisó">Por traer · ${n === 0 ? 'hoy' : n + (n === 1 ? ' día' : ' días')}</span>`;
+    return `<span class="badge b-${c}" title="días desde que Finance la revisó">Sin venir · ${n === 0 ? 'hoy' : n + (n === 1 ? ' día' : ' días')}</span>`;
   }
   return '';
 }
@@ -1252,12 +1318,16 @@ function pintar(){
 
   // El orden depende de lo que se está mirando. En "por traer" y "me tocan hoy"
   // va primero la que más lleva enfriándose; en el resto, la que más quema.
-  if (ETAPA === 'por_traer') v.sort((x,y) => diasPorTraer(y) - diasPorTraer(x));
+  if (['por_traer','apro_sin_venir','posi_sin_venir'].includes(ETAPA)) v.sort((x,y) => diasPorTraer(y) - diasPorTraer(x));
   else if (ETAPA === 'hoy_toca') v.sort((x,y) => String(x.proximo_contacto||'0').localeCompare(String(y.proximo_contacto||'0')) || diasPorTraer(y) - diasPorTraer(x));
   else v.sort((x,y) => quema(y) - quema(x));
   const eFil = etiquetaFiltroEtapa();
   const cab = document.getElementById('filtro-etapa');
-  if (cab) cab.innerHTML = eFil ? `<span>Mostrando: <b>${esc(eFil)}</b> · ${v.length}</span><button onclick="irA({})">Quitar ✕</button>` : '';
+  if (cab) cab.innerHTML = eFil ? `<span>Mostrando: <b>${esc(eFil)}</b> · ${v.length}</span>
+      <span class="fe-b">${v.length ? `<button onclick="copiarLista()">📋 Copiar nombres</button>` : ''}<button onclick="irA({})">Quitar ✕</button></span>` : '';
+  document.querySelectorAll('.chip[data-f]').forEach(x => x.classList.toggle('on',
+    x.dataset.f === (ETAPA !== 'todas' && ETAPA !== 'hoy_toca' ? 'e:' + ETAPA : FILTRO)));
+  if (DES_MAL && sub) sub.textContent += ' · ⚠️ no se pudo revisar quién vino; se reintenta solo';
   if (cab) cab.style.display = eFil ? '' : 'none';
   document.getElementById('lista').innerHTML = v.length ? v.map(fila).join('')
     : `<div class="vacio">${TODAS.length ? (LOC === 'todas' ? 'Nada con ese filtro.' : 'Nada con ese filtro en ' + esc(LOC === 'sin' ? 'aplicaciones sin tienda' : LOC) + '.') : 'Todavía no hay aplicaciones.<br>Cuando un vendedor mande la primera, aparece aquí sola.'}</div>`;
@@ -1299,7 +1369,6 @@ function fila(a){
         ${a.veredicto ? `<span class="badge b-${VER_COLOR[a.veredicto]}" title="${esc((a.veredicto_por||'') + (a.veredicto_at ? ' · ' + cuandoRelativo(a.veredicto_at) : ''))}">${esc(et('veredicto', a.veredicto))}</span>`
                       : '<span class="badge b-gris">Sin revisar</span>'}
         ${a.urgencia ? `<span class="badge b-${urg}">${esc(et('urgencia', a.urgencia))}</span>` : ''}
-        ${a.estado !== 'nueva' ? `<span class="badge b-azul">${esc(et('estado', a.estado))}</span>` : ''}
         ${(a.bitacora || []).filter(x=>(x.tipo!=='etapa'&&x.tipo!=='veredicto')).length ? `<span class="badge b-gris" title="notas de Finance">✎ ${(a.bitacora || []).filter(x=>(x.tipo!=='etapa'&&x.tipo!=='veredicto')).length}</span>` : ''}
         ${a.copia_estado && a.copia_estado !== 'enviada' ? `<span class="badge b-ambar" title="${esc(COPIA_MAL[a.copia_estado] || a.copia_estado)}">✉ no le llegó</span>` : ''}
         ${!a.crm_contact_id ? '<span class="badge b-gris" title="Este cliente no existe como lead en el CRM">sin lead</span>' : ''}
@@ -1381,8 +1450,6 @@ function fila(a){
         ${a.crm_contact_id ? `<a class="btn btn-ghost" style="text-decoration:none;display:inline-block" target="_blank" href="https://app.smartwavedigital.io/v2/location/ez4QcQYqIRKvgT8fIQ22/contacts/detail/${esc(a.crm_contact_id)}">Ver en el CRM</a>` : ''}
         <button class="btn btn-ghost" onclick="copiar('${a.codigo || a.id}', this)">Copiar link</button>
         <a class="btn btn-ghost" style="text-decoration:none;display:inline-block" href="${a.codigo ? a.codigo : 'a.html?id=' + a.id}" target="_blank">Abrir link</a>
-        ${['nueva','trabajando','esperando','cerrada'].filter(e => e !== a.estado)
-          .map(e => `<button class="btn btn-ghost" onclick="marcar('${a.id}','${e}')">${esc(et('estado', e))}</button>`).join('')}
         ${String(QUIEN).toLowerCase() === 'saul'
           ? `<button class="btn btn-ghost" style="color:var(--red);margin-left:auto" onclick="borrar('${a.id}')">Borrar</button>` : ''}
       </div>
@@ -1525,8 +1592,8 @@ function pintarMias(){
   document.getElementById('mia-kpis').innerHTML = `
     <div class="embudo">
       ${btn('trabajo', toca, 'Te tocan hoy', toca ? 'var(--red)' : 'var(--green)')}
-      ${btn('por_traer', c('por_traer'), 'Por traer', c('por_traer') ? 'var(--yellow)' : null)}
-      ${btn('vino', c('vino') + c('vendida'), 'Vinieron', 'var(--blue)')}
+      ${btn('por_traer', c('por_traer'), 'Aprobadas y posibles sin venir', c('por_traer') ? 'var(--yellow)' : null)}
+      ${btn('vino', c('vino'), 'Vinieron, no compraron', 'var(--blue)')}
       ${btn('todas', MIAS.length, 'Todas mis apps', null)}
     </div>`;
   document.getElementById('mia-kpis').className = '';
@@ -1537,7 +1604,7 @@ function pintarMias(){
   let v = MIAS.slice();
   if (MIA_ETAPA === 'trabajo') v = v.filter(meToca);
   else if (MIA_ETAPA === 'por_traer') v = v.filter(a => etapa(a) === 'por_traer');
-  else if (MIA_ETAPA === 'vino') v = v.filter(a => etapa(a) === 'vino' || etapa(a) === 'vendida');
+  else if (MIA_ETAPA === 'vino') v = v.filter(a => etapa(a) === 'vino');
   v.sort((x, y) => (meToca(y) - meToca(x)) || (diasPorTraer(y) - diasPorTraer(x)) || (new Date(y.created_at) - new Date(x.created_at)));
   if (!v.length){
     lista.innerHTML = `<div class="vacio">${MIA_ETAPA === 'trabajo' ? '✓ No te toca llamar a nadie hoy.' : 'Nada aquí.'}</div>`;
@@ -1787,7 +1854,10 @@ async function marcar(id, estado){
 document.getElementById('buscar').addEventListener('input', e => { BUSCA = e.target.value; pintar(); });
 document.querySelectorAll('.chip[data-f]').forEach(c => c.onclick = () => {
   document.querySelectorAll('.chip[data-f]').forEach(x => x.classList.remove('on'));
-  c.classList.add('on'); FILTRO = c.dataset.f; ABIERTA = null; pintar();
+  const f = c.dataset.f;
+  if (f.startsWith('e:')){ ETAPA = f.slice(2); FILTRO = 'todas'; }
+  else { FILTRO = f; ETAPA = 'todas'; }
+  c.classList.add('on'); ABIERTA = null; pintar();
 });
 document.querySelectorAll('.chip[data-v]').forEach(c => c.onclick = () => {
   document.querySelectorAll('.chip[data-v]').forEach(x => x.classList.remove('on'));
