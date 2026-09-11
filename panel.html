@@ -23,6 +23,92 @@
 <title>Aplicaciones online — Auto Republic</title>
 <link rel="stylesheet" href="estilo.css">
 <style>
+
+  /* ── Sistema de oportunidades ─────────────────────────────────────────── */
+  .embudo{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:8px;}
+  @media(min-width:700px){.embudo{grid-template-columns:repeat(4,1fr);gap:10px;}}
+  .emb{background:var(--gray-100);border:1.5px solid transparent;border-radius:12px;padding:13px 14px;text-align:left;cursor:pointer;
+       font-family:inherit;transition:border-color .15s,background .15s,transform .1s;min-height:84px;}
+  .emb:hover{border-color:var(--gray-300);}
+  .emb:active{transform:scale(.98);}
+  .emb.on{background:#fff;border-color:var(--primary);box-shadow:var(--shadow);}
+  .emb.caliente{background:#fff7ed;}
+  .emb.caliente.on{background:#fff;}
+  .emb-n{font-size:26px;font-weight:800;line-height:1;color:var(--gray-900);}
+  .emb-l{font-size:11px;color:var(--gray-500);text-transform:uppercase;letter-spacing:.6px;margin-top:7px;font-weight:700;}
+  .emb-s{font-size:12px;color:var(--gray-500);margin-top:4px;line-height:1.3;}
+  .emb-s b{color:var(--red);}
+  .emb-otros{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 14px;}
+  .lnk{background:none;border:0;padding:6px 10px;border-radius:999px;font-size:13px;color:var(--gray-500);cursor:pointer;font-family:inherit;}
+  .lnk b{color:var(--gray-900);}
+  .lnk:hover{background:var(--gray-100);}
+  .lnk.on{background:var(--primary);color:#fff;}
+  .lnk.on b{color:#fff;}
+  .lnk.quitar{color:var(--blue);font-weight:600;}
+  .filtro-etapa{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#eff6ff;border-radius:10px;
+       padding:9px 12px;margin:0 0 12px;font-size:13px;color:#1e40af;}
+  .filtro-etapa button{background:none;border:0;color:#1e40af;font-weight:700;cursor:pointer;font-size:13px;font-family:inherit;white-space:nowrap;}
+
+  .paso{margin-top:10px;font-size:13px;font-weight:600;color:var(--gray-700);background:var(--gray-100);border-radius:8px;padding:8px 11px;}
+  .paso.rojo{background:#fef2f2;color:#991b1b;}
+  .paso.ambar{background:#fffbeb;color:#92400e;}
+  .paso.gris{background:var(--gray-100);color:var(--gray-500);font-weight:500;}
+
+  .seg{margin-top:10px;border-top:1px dashed var(--gray-200);padding-top:10px;}
+  .seg-t{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--gray-400);margin-bottom:7px;}
+  .seg-b{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;}
+  @media(min-width:560px){.seg-b{grid-template-columns:repeat(4,1fr);}}
+  .seg-b button,.seg-btn{min-height:40px;padding:8px 10px;border-radius:9px;border:1.5px solid var(--gray-200);background:#fff;
+       font-size:13px;font-weight:600;color:var(--gray-700);cursor:pointer;font-family:inherit;}
+  .seg-b button:hover{border-color:var(--gray-300);}
+  .seg-b button.on{border-color:var(--primary);background:var(--primary);color:#fff;}
+  .seg-b button.mal{color:#991b1b;}
+  .seg-b button.mal.on{background:#991b1b;border-color:#991b1b;color:#fff;}
+  .seg-sub{font-size:12px;font-weight:700;color:var(--gray-700);margin:12px 0 6px;}
+  .seg-sub span{font-weight:500;color:var(--gray-400);}
+  .seg-chips{display:flex;flex-wrap:wrap;gap:6px;}
+  .seg-chips button{min-height:38px;padding:7px 13px;border-radius:999px;border:1.5px solid var(--gray-200);background:#fff;
+       font-size:13px;font-weight:600;color:var(--gray-700);cursor:pointer;font-family:inherit;}
+  .seg-chips button:hover{border-color:var(--primary);color:var(--primary);}
+  .seg-in{width:100%;box-sizing:border-box;min-height:42px;padding:10px 12px;border:1.5px solid var(--gray-200);border-radius:9px;
+       font-size:14px;font-family:inherit;outline:none;}
+  .seg-in:focus{border-color:var(--primary);}
+  .seg-otro{display:flex;gap:6px;margin-top:8px;}
+  .seg-otro .seg-in{flex:1;}
+
+  .kpi-clic{text-align:left;cursor:pointer;border:1.5px solid transparent;font-family:inherit;position:relative;transition:border-color .15s;}
+  .kpi-clic:hover{border-color:var(--gray-300);}
+  .kpi-clic:active{transform:scale(.98);}
+  .kpi-ver{position:absolute;top:12px;right:12px;font-size:11px;font-weight:700;color:var(--gray-400);}
+  .kpi-clic:hover .kpi-ver{color:var(--blue);}
+
+  .emb-per{display:flex;align-items:stretch;gap:4px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  .emb-per::-webkit-scrollbar{display:none;}
+  .emb-per button{flex:1;min-width:96px;background:var(--gray-100);border:1.5px solid transparent;border-radius:12px;padding:12px;
+       text-align:left;cursor:pointer;font-family:inherit;}
+  .emb-per button:hover{border-color:var(--gray-300);}
+  .emb-per .n{font-size:22px;font-weight:800;line-height:1;}
+  .emb-per .l{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-500);margin-top:6px;}
+  .emb-per .flecha{display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--gray-300);font-size:14px;min-width:34px;}
+  .emb-per .flecha span{font-size:11px;font-weight:700;color:var(--gray-500);}
+
+  .riesgo{display:flex;flex-direction:column;gap:6px;}
+  .riesgo-f{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;border:1.5px solid var(--gray-200);
+       border-radius:10px;padding:10px 12px;cursor:pointer;text-align:left;font-family:inherit;min-height:48px;}
+  .riesgo-f:hover{border-color:var(--gray-300);}
+  .riesgo-n{font-size:14px;font-weight:700;color:var(--gray-900);}
+  .riesgo-m{font-size:12px;color:var(--gray-500);margin-top:2px;}
+  .riesgo-d{font-size:13px;font-weight:800;color:var(--yellow);white-space:nowrap;}
+  .riesgo-d.rojo{color:var(--red);}
+
+  .celda{background:none;border:0;padding:4px 8px;border-radius:6px;cursor:pointer;font-weight:700;font-size:14px;font-family:inherit;min-width:34px;}
+  .celda:hover{background:var(--gray-100);text-decoration:underline;}
+  .celda.nom{font-weight:700;color:var(--gray-900);padding-left:0;text-align:left;}
+
+  #avisito{position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);background:var(--gray-900);color:#fff;padding:11px 18px;
+       border-radius:999px;font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:all .2s;z-index:50;max-width:90vw;text-align:center;}
+  #avisito.on{opacity:1;transform:translate(-50%,0);}
+  #avisito.mal{background:#991b1b;}
   .kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px;}
   @media(min-width:700px){.kpis{grid-template-columns:repeat(4,1fr);}}
   .kpi{background:var(--gray-100);border-radius:12px;padding:14px;}
@@ -225,7 +311,8 @@
   </div>
   <div class="body">
     <div id="banda"></div>
-    <div class="kpis" id="kpis"></div>
+    <div id="kpis"></div>
+    <div id="filtro-etapa" class="filtro-etapa" style="display:none"></div>
     <div class="filtros" style="margin-bottom:8px">
       <div class="menu" id="menu-tienda"></div>
       <div class="menu" id="menu-vendedor"></div>
@@ -356,7 +443,12 @@ function errorPuerta(msg){
   document.getElementById('puerta-error').innerHTML = `<div class="nota warn"><span>⚠️</span><div>${esc(msg)}</div></div>`;
 }
 async function cargar(){
-  const filas = await rpc('ar_oa_todas', { p_codigo: CODIGO }).catch(() => null);
+  // Las fichas y su desenlace (¿vino? ¿compró?) se piden juntas: el desenlace
+  // cambia la etapa de cada ficha, y pintarlas sin él las dejaría mal ubicadas.
+  const [filas] = await Promise.all([
+    rpc('ar_oa_todas', { p_codigo: CODIGO }).catch(() => null),
+    cargarDesenlaces((typeof CRM !== 'undefined' && CRM && CRM.email) || null),
+  ]);
   if (Array.isArray(filas)) { TODAS = filas; ULTIMA = Date.now(); pintar(); }
 }
 
@@ -380,7 +472,8 @@ function ocupado(){
    moverle nada a quien esta trabajando. */
 function huella(filas){
   return filas.map(a => [a.id, a.estado, a.veredicto, a.deal_number, a.fico, a.fico_co, a.fico_txt, a.fico_co_txt, (a.docs||[]).length,
-    (a.bitacora||[]).length, a.copia_estado, a.crm_contact_id].join('~')).join('|');
+    (a.bitacora||[]).length, a.copia_estado, a.crm_contact_id, a.perdida_at, a.proximo_contacto,
+    (DES[a.id]||{}).vino_fecha, (DES[a.id]||{}).vendida].join('~')).join('|');
 }
 
 /* Redibujar sin sacarlo de donde estaba: se guarda a que altura esta y se devuelve
@@ -606,6 +699,11 @@ function visibles(){
        todavía iba a escribir la nota. El filtro es para elegir qué mirar, no para
        arrebatar lo que uno tiene abierto. Al cerrarla se va sola, como debe ser. */
     if (a.id === ABIERTA) return true;
+    // La etapa del embudo (por traer, vino, vendida...) y el rango de fechas que
+    // viene de hacer clic en un número de los KPIs.
+    if (ETAPA === 'hoy_toca' && !meToca(a)) return false;
+    if (ETAPA !== 'todas' && ETAPA !== 'hoy_toca' && etapa(a) !== ETAPA) return false;
+    if (RANGO && !enRango(a[RANGO.campo], RANGO.a, RANGO.b)) return false;
     // Veredicto y etapa son ejes distintos: se cruzan, no se pisan.
     if (VER === 'sinrevisar' && a.veredicto) return false;
     if (['aprobado','posible','negado'].includes(VER) && a.veredicto !== VER) return false;
@@ -661,6 +759,13 @@ function kpiRango(p){
 const sinAcentos = t => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 const enRango = (iso, a, b) => { if (!iso) return false; const t = new Date(iso); return t >= a && t < b; };
 
+// El rango del período elegido en los KPIs, para que la lista muestre lo mismo que el número.
+function rangoKpi(campo){
+  if (KPI_PER === 'todo') return null;
+  const [a, b, etq] = kpiRango(KPI_PER);
+  return { campo, a, b, etq: (campo === 'veredicto_at' ? 'revisadas ' : 'entraron ') + etq.toLowerCase() };
+}
+
 function verKpis(){
   KPI_ON = !KPI_ON;
   document.getElementById('chip-kpis').classList.toggle('on', KPI_ON);
@@ -696,17 +801,33 @@ function pintarKpis(){
   const porV = {};
   base.forEach(x => {
     const e = (x.vendedor_email||'').toLowerCase(); if (!e) return;
-    const o = porV[e] = porV[e] || { nombre: x.vendedor_nombre, tot:0, per:0, apro:0, nega:0, rev:0, sin:0 };
+    const o = porV[e] = porV[e] || { email: e, nombre: x.vendedor_nombre, tot:0, per:0, apro:0, posi:0, nega:0, rev:0, sin:0, traer:0, vino:0, vend:0 };
     o.tot++;
     if (enRango(x.created_at, a, b)) o.per++;
-    if (x.veredicto) { o.rev++; if (x.veredicto==='aprobado') o.apro++; if (x.veredicto==='negado') o.nega++; }
+    if (x.veredicto) { o.rev++; if (x.veredicto==='aprobado') o.apro++; if (x.veredicto==='posible') o.posi++; if (x.veredicto==='negado') o.nega++; }
     else o.sin++;
+    const et2 = etapa(x);
+    if (et2 === 'por_traer') o.traer++;
+    if (et2 === 'vino') o.vino++;
+    if (et2 === 'vendida') o.vend++;
   });
   const filas = Object.values(porV).sort((p,q) => q.per - p.per || q.tot - p.tot);
   const lider = filas.filter(f => f.per > 0)[0];
 
-  const tarjeta = (n, l, color, sub) =>
-    `<div class="kpi"><div class="n" ${color?`style="color:${color}"`:''}>${n}</div><div class="l">${esc(l)}</div>${sub?`<div class="kpi-sub">${esc(sub)}</div>`:''}</div>`;
+  // Cada número es un botón: al tocarlo se ven EXACTAMENTE esas fichas, con
+  // nombre, teléfono, vendedor y fecha. Para hacer seguimiento, no solo mirar.
+  const tarjeta = (n, l, color, sub, clic) => clic
+    ? `<button class="kpi kpi-clic" onclick="${clic}"><div class="n" ${color?`style="color:${color}"`:''}>${n}</div><div class="l">${esc(l)}</div>${sub?`<div class="kpi-sub">${esc(sub)}</div>`:''}<div class="kpi-ver">Ver →</div></button>`
+    : `<div class="kpi"><div class="n" ${color?`style="color:${color}"`:''}>${n}</div><div class="l">${esc(l)}</div>${sub?`<div class="kpi-sub">${esc(sub)}</div>`:''}</div>`;
+  const R = campo => KPI_PER === 'todo' ? 'null' : `rangoKpi('${campo}')`;
+  // El embudo del período: de lo que entró, cuánto se aprobó, cuánto vino, cuánto compró.
+  const perRec = recibidas;
+  const perPos = perRec.filter(x => x.veredicto === 'aprobado' || x.veredicto === 'posible');
+  const perVino = perRec.filter(x => ['vino','vendida'].includes(etapa(x)));
+  const perVend = perRec.filter(x => etapa(x) === 'vendida');
+  const pct = (p, q) => q ? Math.round(p / q * 100) + '%' : '—';
+  const enRiesgo = base.filter(x => etapa(x) === 'por_traer' && diasPorTraer(x) >= 3)
+                       .sort((p, q) => diasPorTraer(q) - diasPorTraer(p));
 
   document.getElementById('kpi-vista').innerHTML = `
     <div class="filtros" style="margin-bottom:14px">
@@ -715,17 +836,47 @@ function pintarKpis(){
       <span class="ftit" style="margin-left:auto">${esc(etq)}${LOC!=='todas'?' · '+esc(LOC):''}${VEND!=='todos'?' · '+esc((base[0]||{}).vendedor_nombre||''):''}</span>
     </div>
 
-    <div class="kpis">
-      ${tarjeta(recibidas.length, 'Recibidas', null, etq)}
-      ${tarjeta(revisadas.length, 'Revisadas', null, etq)}
-      ${tarjeta(apro.length, 'Aprobadas', apro.length?'var(--green)':null, etq)}
-      ${tarjeta(nega.length, 'Negadas', nega.length?'var(--red)':null, etq)}
+    <div class="sect2" style="margin-top:4px">
+      <h3>El embudo · ${esc(etq.toLowerCase())}</h3>
+      <div class="kpi-hint">De las aplicaciones que entraron en ${esc(etq.toLowerCase())}: cuántas salieron aprobadas o con posibilidad, cuántas vinieron al dealer y cuántas compraron. <b>Vino</b> y <b>compró</b> se detectan solos, cruzando el teléfono con el reporte diario.</div>
+      <div class="emb-per">
+        <button onclick="irA({rango:${R('created_at')}})"><div class="n">${perRec.length}</div><div class="l">Entraron</div></button>
+        <div class="flecha">→<span>${pct(perPos.length, perRec.length)}</span></div>
+        <button onclick="irA({etapa:'por_traer',rango:${R('created_at')}})" class="${perPos.length?'':'vacio'}"><div class="n" style="color:var(--green)">${perPos.length}</div><div class="l">Aprob. + posibles</div></button>
+        <div class="flecha">→<span>${pct(perVino.length, perPos.length)}</span></div>
+        <button onclick="irA({etapa:'vino',rango:${R('created_at')}})"><div class="n" style="color:var(--blue)">${perVino.length}</div><div class="l">Vinieron</div></button>
+        <div class="flecha">→<span>${pct(perVend.length, perVino.length)}</span></div>
+        <button onclick="irA({etapa:'vendida',rango:${R('created_at')}})"><div class="n" style="color:var(--green)">${perVend.length}</div><div class="l">Compraron</div></button>
+      </div>
+    </div>
+
+    ${enRiesgo.length ? `
+    <div class="sect2">
+      <h3>Se están enfriando · ${enRiesgo.length}</h3>
+      <div class="kpi-hint">Aprobadas o con posibilidad que llevan 3 días o más sin venir. Cada día que pasa es más difícil traerlas.</div>
+      <div class="riesgo">
+        ${enRiesgo.slice(0, 8).map(x => `
+          <button class="riesgo-f" onclick="irA({etapa:'por_traer'});setTimeout(()=>abrir('${x.id}'),50)">
+            <div><div class="riesgo-n">${esc(x.cliente_nombre)}</div>
+                 <div class="riesgo-m">${esc(tel(x.cliente_telefono))} · ${esc(x.vendedor_nombre || '')} · ${esc(et('veredicto', x.veredicto))} ${esc(fCorta(x.veredicto_at))}</div></div>
+            <div class="riesgo-d ${diasPorTraer(x) >= 7 ? 'rojo' : ''}">${diasPorTraer(x)} días</div>
+          </button>`).join('')}
+        ${enRiesgo.length > 8 ? `<button class="lnk" onclick="irA({etapa:'por_traer'})">Ver las ${enRiesgo.length} →</button>` : ''}
+      </div>
+    </div>` : ''}
+
+    <div class="kpis" style="margin-top:18px">
+      ${tarjeta(recibidas.length, 'Recibidas', null, etq, `irA({rango:${R('created_at')}})`)}
+      ${tarjeta(revisadas.length, 'Revisadas', null, etq, `irA({rango:${R('veredicto_at')}})`)}
+      ${tarjeta(apro.length, 'Aprobadas', apro.length?'var(--green)':null, etq, `irA({ver:'aprobado',rango:${R('veredicto_at')}})`)}
+      ${tarjeta(nega.length, 'Negadas', nega.length?'var(--red)':null, etq, `irA({ver:'negado',rango:${R('veredicto_at')}})`)}
     </div>
 
     <div class="kpis" style="margin-top:10px">
-      ${tarjeta(tasa===null?'—':tasa+'%', 'De las revisadas, aprobadas', tasa===null?null:(tasa>=50?'var(--green)':tasa>=25?'var(--yellow)':'var(--red)'), posi.length?posi.length+' con posibilidad':'')}
+      ${tarjeta(tasa===null?'—':tasa+'%', 'De las revisadas, aprobadas', tasa===null?null:(tasa>=50?'var(--green)':tasa>=25?'var(--yellow)':'var(--red)'), etq, `irA({ver:'aprobado',rango:${R('veredicto_at')}})`)}
+      ${tarjeta(posi.length, 'Con posibilidad', posi.length?'var(--yellow)':null, etq, `irA({ver:'posible',rango:${R('veredicto_at')}})`)}
       ${tarjeta(tiempo, 'Tardan en revisar', null, 'mediana, histórico')}
-      ${tarjeta(sinRev.length, 'Sin revisar', sinRev.length?'var(--yellow)':'var(--green)', sinRev.length?'acumuladas':'al día ✓')}
+      ${tarjeta(sinRev.length, 'Sin revisar', sinRev.length?'var(--yellow)':'var(--green)', sinRev.length?'acumuladas':'al día ✓', sinRev.length ? `irA({etapa:'sin_revisar'})` : null)}
       ${tarjeta(masVieja ? cuandoRelativo(masVieja.created_at).replace('hace ','') : '—', 'La más vieja esperando', null, masVieja ? masVieja.cliente_nombre : '')}
     </div>
     <div class="kpis" style="margin-top:10px">
@@ -741,15 +892,24 @@ function pintarKpis(){
       <div class="kpi-hint">${lider ? `<b>${esc(lider.nombre)}</b> va de primero — ${lider.per} en ${etq.toLowerCase()}.` : `Nadie ha enviado en ${etq.toLowerCase()}.`}</div>
       <div class="tabla-scroll">
         <table class="tabla">
-          <thead><tr><th>Vendedor</th><th>${esc(etq)}</th><th>Total</th><th>Aprob.</th><th>Neg.</th><th>Sin revisar</th><th>%</th></tr></thead>
-          <tbody>${filas.map(f => `<tr>
-            <td class="nom2">${esc(f.nombre)}</td>
-            <td><b>${f.per||'—'}</b></td>
+          <thead><tr><th>Vendedor</th><th>${esc(etq)}</th><th>Total</th><th>Aprob.</th><th>Posib.</th><th>Neg.</th><th>Por traer</th><th>Vinieron</th><th>Vendidas</th><th>Conv.</th></tr></thead>
+          <tbody>${filas.map(f => {
+            // Cada número abre esas fichas de ese vendedor.
+            const c = (n, color, o) => n
+              ? `<td><button class="celda" style="color:${color}" onclick='irA(${JSON.stringify(Object.assign({ vend: f.email }, o))})'>${n}</button></td>`
+              : `<td style="color:var(--gray-300)">—</td>`;
+            const conv = (f.apro + f.posi) ? Math.round(f.vend / (f.apro + f.posi) * 100) + '%' : '—';
+            return `<tr>
+            <td class="nom2"><button class="celda nom" onclick='irA(${JSON.stringify({ vend: f.email })})'>${esc(f.nombre)}</button></td>
+            <td>${f.per ? `<button class="celda" onclick="irA({vend:'${f.email}',rango:${R('created_at')}})"><b>${f.per}</b></button>` : '—'}</td>
             <td>${f.tot}</td>
-            <td style="color:${f.apro?'var(--green)':'var(--gray-300)'}">${f.apro||'—'}</td>
-            <td style="color:${f.nega?'var(--red)':'var(--gray-300)'}">${f.nega||'—'}</td>
-            <td style="color:${f.sin?'var(--yellow)':'var(--gray-300)'}">${f.sin||'—'}</td>
-            <td>${f.rev?Math.round(f.apro/f.rev*100)+'%':'—'}</td></tr>`).join('')}</tbody>
+            ${c(f.apro, 'var(--green)', { ver: 'aprobado' })}
+            ${c(f.posi, 'var(--yellow)', { ver: 'posible' })}
+            ${c(f.nega, 'var(--red)', { ver: 'negado' })}
+            ${c(f.traer, 'var(--red)', { etapa: 'por_traer' })}
+            ${c(f.vino, 'var(--blue)', { etapa: 'vino' })}
+            ${c(f.vend, 'var(--green)', { etapa: 'vendida' })}
+            <td><b>${conv}</b></td></tr>`; }).join('')}</tbody>
         </table>
       </div>
     </div>
@@ -822,6 +982,242 @@ function pintarKpis(){
     </div>`;
 }
 
+/* ══ SISTEMA DE OPORTUNIDADES ════════════════════════════════════════════════
+   Cada aplicación es una oportunidad con dueño y siguiente paso, hasta que se
+   resuelve: se vendió, o se perdió con un motivo.
+
+   Lo que antes no existía: el app no sabía si el cliente aprobado VINO ni si
+   COMPRÓ. Ahora lo sabe solo — el servidor cruza el teléfono contra el reporte
+   diario de visitas. Nadie tiene que acordarse de mover la ficha.
+
+   Medido el 11-sep: de 22 aprobadas vinieron 11 y compraron 8; de 40 posibles
+   vinieron 8 y compraron 2. Treinta y tres nunca vinieron, y no aparecían en
+   ninguna pantalla. Esas son las que este bloque pone al frente. */
+let DES = {}, ETAPA = 'todas', RANGO = null, SEG = null, MIAS = [], YO_EMAIL = '';
+
+const ETAPAS = {
+  sin_revisar: { t: 'Sin revisar',      c: 'ambar', dueno: 'Finance' },
+  por_traer:   { t: 'Por traer',        c: 'rojo',  dueno: 'el vendedor' },
+  vino:        { t: 'Vinieron',         c: 'azul',  dueno: 'el closer' },
+  vendida:     { t: 'Vendidas',         c: 'verde', dueno: '' },
+  negada:      { t: 'Negadas',          c: 'gris',  dueno: '' },
+  perdida:     { t: 'Perdidas',         c: 'gris',  dueno: '' },
+  historico:   { t: 'Históricas',       c: 'gris',  dueno: '' },
+};
+
+function etapa(a){
+  const d = DES[a.id] || {};
+  if (d.vendida) return 'vendida';
+  if (a.perdida_at) return 'perdida';
+  if (d.vino_fecha) return 'vino';
+  if (a.veredicto === 'historico') return 'historico';
+  if (a.veredicto === 'negado') return 'negada';
+  if (a.veredicto === 'aprobado' || a.veredicto === 'posible') return 'por_traer';
+  return 'sin_revisar';
+}
+const hoyFL = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+const fCorta = iso => { if (!iso) return ''; const p = String(iso).slice(0, 10).split('-'); return `${+p[2]}/${+p[1]}`; };
+const sumarDias = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); };
+
+// Lo que lleva enfriándose: días desde que Finance dio el veredicto.
+function diasPorTraer(a){
+  const desde = a.veredicto_at || a.created_at;
+  return Math.max(0, Math.floor((Date.now() - new Date(desde)) / 864e5));
+}
+// ¿Te toca hoy? Por traer y: el próximo contacto es hoy o ya pasó — o nunca se le
+// ha dado seguimiento. Una aprobada que nadie ha llamado es la peor de todas.
+function meToca(a){
+  if (etapa(a) !== 'por_traer') return false;
+  if (a.proximo_contacto) return a.proximo_contacto <= hoyFL();
+  return true;
+}
+
+async function cargarDesenlaces(email){
+  const r = await rpc('ar_oa_desenlaces', { p_codigo: CODIGO || null, p_email: email || null }).catch(() => null);
+  if (!Array.isArray(r)) return false;
+  const nuevo = {}; r.forEach(d => { nuevo[d.id] = d; }); DES = nuevo;
+  return true;
+}
+
+/* El embudo de arriba: el estado VIVO del negocio, no el de un período. Cada
+   número es un botón que deja la lista mostrando exactamente esas fichas. */
+function embudoHTML(base){
+  const c = {}; Object.keys(ETAPAS).forEach(k => c[k] = 0);
+  base.forEach(a => { c[etapa(a)]++; });
+  const toca = base.filter(meToca).length;
+  const cerrables = base.filter(a => a.veredicto === 'aprobado' || a.veredicto === 'posible').length;
+  const sinRev = base.filter(a => !a.veredicto);
+  const vieja = sinRev.length ? Math.round(Math.max(...sinRev.map(horasEsperando))) : 0;
+  const t = (k, n, sub, color, extra) => `
+    <button class="emb ${ETAPA === k ? 'on' : ''} ${extra || ''}" onclick="irA({etapa:'${k}'})">
+      <div class="emb-n" ${color ? `style="color:${color}"` : ''}>${n}</div>
+      <div class="emb-l">${ETAPAS[k] ? ETAPAS[k].t : k}</div>
+      ${sub ? `<div class="emb-s">${sub}</div>` : ''}
+    </button>`;
+  return `
+    <div class="embudo">
+      ${t('sin_revisar', c.sin_revisar, c.sin_revisar ? `la más vieja ${vieja < 48 ? vieja + ' h' : Math.round(vieja / 24) + ' días'}` : 'al día ✓',
+          c.sin_revisar ? 'var(--yellow)' : 'var(--green)')}
+      ${t('por_traer', c.por_traer, toca ? `<b>${toca}</b> te tocan hoy` : 'nadie pendiente hoy',
+          c.por_traer ? 'var(--red)' : null, c.por_traer ? 'caliente' : '')}
+      ${t('vino', c.vino, 'vinieron y no compraron', c.vino ? 'var(--blue)' : null)}
+      ${t('vendida', c.vendida, cerrables ? `${Math.round(c.vendida / cerrables * 100)}% de las aprobadas y posibles` : '', c.vendida ? 'var(--green)' : null)}
+    </div>
+    <div class="emb-otros">
+      <button class="lnk ${ETAPA === 'hoy_toca' ? 'on' : ''}" onclick="irA({etapa:'hoy_toca'})">📞 Me tocan hoy <b>${toca}</b></button>
+      <button class="lnk ${ETAPA === 'negada' ? 'on' : ''}" onclick="irA({etapa:'negada'})">Negadas <b>${c.negada}</b></button>
+      <button class="lnk ${ETAPA === 'perdida' ? 'on' : ''}" onclick="irA({etapa:'perdida'})">Perdidas <b>${c.perdida}</b></button>
+      ${ETAPA !== 'todas' ? `<button class="lnk quitar" onclick="irA({})">Ver todas ✕</button>` : ''}
+    </div>`;
+}
+
+/* De un número a la lista. Cuando el número viene de un período ("aprobadas hoy:
+   6"), la lista tiene que mostrar ESAS 6 — no las 22 de siempre. Por eso viaja
+   también el rango de fechas y sale como filtro visible, para que se entienda por
+   qué se ven esas y no otras. */
+function irA(o){
+  o = o || {};
+  if (KPI_ON) verKpis();
+  VER = o.ver || 'todas'; ETAPA = o.etapa || 'todas'; FILTRO = 'todas'; SOLO_HOY = false;
+  if (o.vend !== undefined) VEND = o.vend || 'todos';
+  RANGO = o.rango || null;
+  BUSCA = ''; const b = document.getElementById('buscar'); if (b) b.value = '';
+  document.querySelectorAll('.chip[data-v]').forEach(x => x.classList.toggle('on', x.dataset.v === VER));
+  document.querySelectorAll('.chip[data-f]').forEach(x => x.classList.toggle('on', x.dataset.f === 'todas'));
+  ABIERTA = null; SEG = null;
+  pintar();
+  const l = document.getElementById('kpis'); if (l) l.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Qué dice el filtro puesto, en palabras. Sin esto uno no sabe por qué ve tan poco.
+function etiquetaFiltroEtapa(){
+  const partes = [];
+  if (VEND !== 'todos'){
+    const v = TODAS.find(a => (a.vendedor_email || '').toLowerCase() === VEND);
+    partes.push(v ? v.vendedor_nombre : VEND);
+  }
+  if (VER === 'sinrevisar') partes.push('sin revisar');
+  else if (['aprobado','posible','negado'].includes(VER)) partes.push({ aprobado: 'aprobadas', posible: 'con posibilidad', negado: 'negadas' }[VER]);
+  if (ETAPA === 'hoy_toca') partes.push('me tocan hoy');
+  else if (ETAPA !== 'todas') partes.push((ETAPAS[ETAPA] ? ETAPAS[ETAPA].t : ETAPA).toLowerCase());
+  if (RANGO) partes.push(RANGO.etq);
+  const t = partes.join(' · ');
+  return t ? t.charAt(0).toUpperCase() + t.slice(1) : '';
+}
+
+function etiquetaEtapa(a){
+  const e = etapa(a), d = DES[a.id] || {};
+  if (e === 'vendida') return `<span class="badge b-verde">✓ Vendida ${fCorta(d.vendida_fecha)}${d.vendida_deal ? ' · #' + esc(d.vendida_deal) : ''}</span>`;
+  if (e === 'vino') return `<span class="badge b-azul" title="apareció en el reporte diario">Vino ${fCorta(d.vino_fecha)}${d.vino_closer ? ' · ' + esc(String(d.vino_closer).split(' ')[0]) : ''}</span>`;
+  if (e === 'perdida') return `<span class="badge b-gris">✕ Perdida</span>`;
+  if (e === 'por_traer'){
+    const n = diasPorTraer(a);
+    const c = n >= 4 ? 'rojo' : n >= 2 ? 'ambar' : 'gris';
+    return `<span class="badge b-${c}" title="días desde que Finance la revisó">Por traer · ${n === 0 ? 'hoy' : n + (n === 1 ? ' día' : ' días')}</span>`;
+  }
+  return '';
+}
+
+// El siguiente paso, en una línea. Lo que uno tiene que hacer con esta ficha.
+function siguientePaso(a){
+  const e = etapa(a);
+  if (e === 'perdida') return `<div class="paso gris">✕ ${esc(a.perdida_motivo || 'sin motivo')}${a.perdida_por ? ' · ' + esc(a.perdida_por) : ''}</div>`;
+  if (e !== 'por_traer') return '';
+  const hoy = hoyFL();
+  if (a.proximo_contacto){
+    const tarde = a.proximo_contacto < hoy, esHoy = a.proximo_contacto === hoy;
+    const txt = a.proximo_tipo === 'visita'
+      ? `📅 Viene ${esHoy ? 'hoy' : 'el ' + fCorta(a.proximo_contacto)}`
+      : `📞 Llamar ${esHoy ? 'hoy' : 'el ' + fCorta(a.proximo_contacto)}`;
+    return `<div class="paso ${tarde ? 'rojo' : esHoy ? 'ambar' : ''}">${txt}${tarde ? ' — ya pasó' : ''}</div>`;
+  }
+  return `<div class="paso rojo">Nadie la ha llamado desde que se ${a.veredicto === 'aprobado' ? 'aprobó' : 'marcó con posibilidad'}</div>`;
+}
+
+/* Los botones de seguimiento. Los usa el manager y el vendedor dueño de la ficha:
+   es el vendedor quien tiene que llamar al cliente aprobado, así que es él quien
+   anota qué pasó. Fecha y motivo se eligen con botones, no con el calendario del
+   teléfono: es más rápido con el cliente al lado, y se ve igual en todos lados. */
+const MOTIVOS = ['Compró en otro lado', 'Ya no le interesa', 'No contesta más', 'No le alcanza el down', 'Necesita co-signer y no tiene'];
+function botonesSeguimiento(a){
+  const e = etapa(a);
+  if (e === 'perdida') return `<div class="seg"><button class="seg-btn" onclick="event.stopPropagation();seguir('${a.id}','reabrir')">↺ Reabrir</button></div>`;
+  if (e !== 'por_traer' && e !== 'vino') return '';
+  const abierto = SEG && SEG.id === a.id ? SEG.accion : null;
+  const dias = [0,1,2,3,4,5,6].map(n => {
+    const iso = sumarDias(n);
+    let et = n === 0 ? 'Hoy' : n === 1 ? 'Mañana' : new Date(iso + 'T12:00').toLocaleDateString('es', { weekday: 'short', day: 'numeric' });
+    et = et.charAt(0).toUpperCase() + et.slice(1);   // "lun 14" → "Lun 14", sin tocar los motivos
+    return { iso, et };
+  });
+  let panel = '';
+  if (abierto === 'viene') panel = `
+    <div class="seg-sub">¿Qué día viene?</div>
+    <div class="seg-chips">${dias.map(d => `<button onclick="event.stopPropagation();mandarSeguimiento('${a.id}','viene','${d.iso}',null)">${d.et}</button>`).join('')}</div>`;
+  if (abierto === 'hable') panel = `
+    <div class="seg-sub">¿Qué dijo? <span>(opcional)</span></div>
+    <input class="seg-in" id="seg-nota-${a.id}" placeholder="Ej. le falta el down, lo junta el viernes" onclick="event.stopPropagation()">
+    <div class="seg-sub">¿Cuándo lo vuelves a llamar?</div>
+    <div class="seg-chips">
+      ${dias.slice(1, 5).map(d => `<button onclick="event.stopPropagation();mandarSeguimiento('${a.id}','hable','${d.iso}',notaSeg('${a.id}'))">${d.et}</button>`).join('')}
+      <button onclick="event.stopPropagation();mandarSeguimiento('${a.id}','hable',null,notaSeg('${a.id}'))">Sin fecha</button>
+    </div>`;
+  if (abierto === 'perdida') panel = `
+    <div class="seg-sub">¿Por qué se perdió?</div>
+    <div class="seg-chips">${MOTIVOS.map(m => `<button onclick="event.stopPropagation();mandarSeguimiento('${a.id}','perdida',null,'${m}')">${m}</button>`).join('')}</div>
+    <div class="seg-otro">
+      <input class="seg-in" id="seg-nota-${a.id}" placeholder="Otro motivo…" onclick="event.stopPropagation()">
+      <button class="seg-btn" onclick="event.stopPropagation();const v=notaSeg('${a.id}');if(v)mandarSeguimiento('${a.id}','perdida',null,v)">Guardar</button>
+    </div>`;
+  return `
+    <div class="seg" onclick="event.stopPropagation()">
+      <div class="seg-t">Seguimiento</div>
+      <div class="seg-b">
+        <button class="${abierto === 'llame' ? 'on' : ''}" onclick="event.stopPropagation();seguir('${a.id}','llame')">📞 No contestó</button>
+        <button class="${abierto === 'hable' ? 'on' : ''}" onclick="event.stopPropagation();seguir('${a.id}','hable')">💬 Hablé con él</button>
+        <button class="${abierto === 'viene' ? 'on' : ''}" onclick="event.stopPropagation();seguir('${a.id}','viene')">📅 Viene…</button>
+        <button class="mal ${abierto === 'perdida' ? 'on' : ''}" onclick="event.stopPropagation();seguir('${a.id}','perdida')">✕ Se perdió</button>
+      </div>
+      ${panel}
+    </div>`;
+}
+const notaSeg = id => { const e = document.getElementById('seg-nota-' + id); return e ? e.value.trim() : ''; };
+
+function repintarDonde(){
+  if (document.getElementById('vista-mia') && document.getElementById('vista-mia').style.display !== 'none') pintarMias();
+  else pintarSinMover();
+}
+function seguir(id, accion){
+  // "No contestó" y "Reabrir" no preguntan nada: se anotan con un toque.
+  if (accion === 'llame' || accion === 'reabrir') return mandarSeguimiento(id, accion, null, null);
+  SEG = (SEG && SEG.id === id && SEG.accion === accion) ? null : { id, accion };
+  repintarDonde();
+  setTimeout(() => { const i = document.getElementById('seg-nota-' + id); if (i && accion !== 'viene') i.focus(); }, 30);
+}
+async function mandarSeguimiento(id, accion, fecha, nota){
+  let r = null;
+  try{
+    r = await rpc('ar_oa_seguir', { p_codigo: CODIGO || null, p_email: YO_EMAIL || ((typeof CRM !== 'undefined' && CRM && CRM.email) || null),
+                                    p_id: id, p_accion: accion, p_fecha: fecha || null, p_nota: nota || null });
+  }catch(e){}
+  if (!Array.isArray(r) || !r[0]){ avisito('No se pudo anotar. Intenta otra vez.', true); return; }
+  const fila2 = r[0];
+  [TODAS, MIAS].forEach(arr => { const i = arr.findIndex(x => x.id === id); if (i >= 0) arr[i] = fila2; });
+  SEG = null;
+  const dicho = { llame: 'Anotado: no contestó · se vuelve a llamar mañana', hable: 'Anotado', viene: 'Anotado: viene el ' + fCorta(fecha),
+                  perdida: 'Marcada como perdida', reabrir: 'Reabierta' }[accion] || 'Anotado';
+  avisito(dicho);
+  repintarDonde();
+}
+// Aviso chiquito abajo, que se va solo. Sin alert() del navegador.
+function avisito(t, mal){
+  let e = document.getElementById('avisito');
+  if (!e){ e = document.createElement('div'); e.id = 'avisito'; document.body.appendChild(e); }
+  e.textContent = t; e.className = mal ? 'mal on' : 'on';
+  clearTimeout(e._t); e._t = setTimeout(() => { e.className = ''; }, 2600);
+}
+
+
 function pintar(){
   pintarMenus();
   if (KPI_ON){ pintarKpis(); return; }
@@ -835,16 +1231,13 @@ function pintar(){
   const cl = document.getElementById('chip-limpiar');
   // Cuántos filtros hay puestos. Sin el número uno no sabe por qué ve tan poco.
   const nFiltros = [VER !== 'todas', FILTRO !== 'todas', LOC !== 'todas', VEND !== 'todos',
-                    !!BUSCA, SOLO_HOY, FICO !== 'todas', FICO_MIN != null || FICO_MAX != null].filter(Boolean).length;
+                    !!BUSCA, SOLO_HOY, FICO !== 'todas', FICO_MIN != null || FICO_MAX != null,
+                    ETAPA !== 'todas', !!RANGO].filter(Boolean).length;
   if (cl){
     cl.style.display = nFiltros ? '' : 'none';
     cl.textContent = nFiltros === 1 ? 'Quitar filtro' : `Quitar ${nFiltros} filtros`;
   }
-  document.getElementById('kpis').innerHTML =
-    `<div class="kpi"><div class="n">${base.length}</div><div class="l">${LOC === 'todas' ? 'En total' : (LOC === 'sin' ? 'Sin tienda' : esc(LOC))}</div></div>
-     <div class="kpi"><div class="n">${deHoy}</div><div class="l">Entraron hoy</div></div>
-     <div class="kpi"><div class="n" style="color:var(--red)">${urgentes}</div><div class="l">Compran ya</div></div>
-     <div class="kpi"><div class="n" style="color:${sinRevisar?'var(--yellow)':'inherit'}">${sinRevisar}</div><div class="l">Sin revisar</div></div>`;
+  document.getElementById('kpis').innerHTML = embudoHTML(base);
   document.getElementById('sub').textContent =
     TODAS.length ? `${v.length} de ${base.length}${LOC !== 'todas' ? ' en ' + (LOC === 'sin' ? 'sin tienda' : LOC) : ''}${VEND !== 'todos' ? ' · ' + ((TODAS.find(a=>(a.vendedor_email||'').toLowerCase()===VEND)||{}).vendedor_nombre || '') : ''} · la última ${cuandoRelativo(TODAS[0].created_at)}`
                  : 'Todavía no hay ninguna';
@@ -854,7 +1247,15 @@ function pintar(){
     sub.textContent += seg < 90 ? ' · al día' : ` · visto hace ${Math.round(seg/60)} min`;
   }
 
-  v.sort((x,y) => quema(y) - quema(x));
+  // El orden depende de lo que se está mirando. En "por traer" y "me tocan hoy"
+  // va primero la que más lleva enfriándose; en el resto, la que más quema.
+  if (ETAPA === 'por_traer') v.sort((x,y) => diasPorTraer(y) - diasPorTraer(x));
+  else if (ETAPA === 'hoy_toca') v.sort((x,y) => String(x.proximo_contacto||'0').localeCompare(String(y.proximo_contacto||'0')) || diasPorTraer(y) - diasPorTraer(x));
+  else v.sort((x,y) => quema(y) - quema(x));
+  const eFil = etiquetaFiltroEtapa();
+  const cab = document.getElementById('filtro-etapa');
+  if (cab) cab.innerHTML = eFil ? `<span>Mostrando: <b>${esc(eFil)}</b> · ${v.length}</span><button onclick="irA({})">Quitar ✕</button>` : '';
+  if (cab) cab.style.display = eFil ? '' : 'none';
   document.getElementById('lista').innerHTML = v.length ? v.map(fila).join('')
     : `<div class="vacio">${TODAS.length ? (LOC === 'todas' ? 'Nada con ese filtro.' : 'Nada con ese filtro en ' + esc(LOC === 'sin' ? 'aplicaciones sin tienda' : LOC) + '.') : 'Todavía no hay aplicaciones.<br>Cuando un vendedor mande la primera, aparece aquí sola.'}</div>`;
 }
@@ -886,6 +1287,7 @@ function fila(a){
         <div class="linea"><span class="tel" onclick="copiarTel(event, this)" title="Toca para copiar · o selecciónalo con el mouse">${esc(tel(a.cliente_telefono))}</span> · ${esc(a.vendedor_nombre)}${a.location ? ' · ' + esc(a.location) : ''} · ${esc(cuandoRelativo(a.created_at))} <span class="cuando">${esc(fechaHora(a.created_at))}</span></div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        ${etiquetaEtapa(a)}
         ${vieneHoy(a) ? `<span class="badge b-azul" style="font-size:12px">📍 VIENE HOY${a.visita_hora ? ' ' + esc(a.visita_hora) : ''}</span>` : ''}
         ${!a.veredicto ? (() => { const h = horasEsperando(a);
             const c = h > 48 ? 'rojo' : h > 24 ? 'ambar' : 'gris';
@@ -907,6 +1309,8 @@ function fila(a){
       const n = (a.bitacora || []).filter(x => x.tipo !== 'etapa' && x.tipo !== 'veredicto').slice(-1)[0];
       return n ? `<div class="ultima"><b>${esc(n.quien)}:</b> ${esc(n.texto)}</div>` : '';
     })()}
+    ${siguientePaso(a)}
+    ${(etapa(a) === 'por_traer' || etapa(a) === 'vino' || etapa(a) === 'perdida') ? botonesSeguimiento(a) : ''}
     <div class="cifras">
       <div class="cif"><div class="n">${dinero(a.pago_mensual) || '—'}</div><div class="l">Mensual</div></div>
       <div class="cif"><div class="n">${dinero(a.down_hoy) || '—'}</div><div class="l">Down hoy</div></div>
@@ -1093,50 +1497,70 @@ async function verMias(nombre, email){
   document.getElementById('vista-mia').style.display = '';
   document.getElementById('mia-sub').textContent = nombre || email;
   document.getElementById('mia-nueva').href = 'index.html?' + new URLSearchParams({ name: nombre || '', email }).toString();
+  YO_EMAIL = (email || '').toLowerCase();
   const lista = document.getElementById('mia-lista');
   lista.innerHTML = '<div class="cargando">Cargando…</div>';
-  let mias = [];
-  try{ mias = await rpc('ar_oa_mias', { p_email: email }) || []; }catch(e){
+  try{
+    const [m] = await Promise.all([rpc('ar_oa_mias', { p_email: email }), cargarDesenlaces(email)]);
+    MIAS = m || [];
+  }catch(e){
     lista.innerHTML = '<div class="vacio">No se pudo conectar. Intenta otra vez.</div>'; return;
   }
-  const n = v => mias.filter(a => a.veredicto === v).length;
-  document.getElementById('mia-kpis').innerHTML =
-    `<div class="kpi"><div class="n">${mias.length}</div><div class="l">Mis aplicaciones</div></div>
-     <div class="kpi"><div class="n" style="color:${mias.filter(a=>!a.veredicto).length?'var(--yellow)':'inherit'}">${mias.filter(a=>!a.veredicto).length}</div><div class="l">Sin revisar</div></div>
-     <div class="kpi"><div class="n" style="color:${n('aprobado')?'var(--green)':'inherit'}">${n('aprobado')}</div><div class="l">Aprobadas</div></div>
-     <div class="kpi"><div class="n">${n('posible')}</div><div class="l">Con posibilidad</div></div>`;
-  if (!mias.length){
+  pintarMias();
+}
+
+/* La vista del vendedor es su lista de trabajo, no un archivo. Arriba lo que le
+   toca hoy; después sus aprobadas que todavía no vienen, de la más fría a la más
+   reciente; y al final el resto. Desde cada ficha anota qué pasó con la llamada. */
+let MIA_ETAPA = 'trabajo';
+function pintarMias(){
+  const lista = document.getElementById('mia-lista');
+  const c = k => MIAS.filter(a => etapa(a) === k).length;
+  const toca = MIAS.filter(meToca).length;
+  const btn = (k, n, l, color) => `<button class="emb ${MIA_ETAPA === k ? 'on' : ''}" onclick="MIA_ETAPA='${k}';SEG=null;pintarMias()">
+      <div class="emb-n" ${color ? `style="color:${color}"` : ''}>${n}</div><div class="emb-l">${l}</div></button>`;
+  document.getElementById('mia-kpis').innerHTML = `
+    <div class="embudo">
+      ${btn('trabajo', toca, 'Te tocan hoy', toca ? 'var(--red)' : 'var(--green)')}
+      ${btn('por_traer', c('por_traer'), 'Por traer', c('por_traer') ? 'var(--yellow)' : null)}
+      ${btn('vino', c('vino') + c('vendida'), 'Vinieron', 'var(--blue)')}
+      ${btn('todas', MIAS.length, 'Todas mis apps', null)}
+    </div>`;
+  document.getElementById('mia-kpis').className = '';
+  if (!MIAS.length){
     lista.innerHTML = `<div class="vacio">Todavía no has enviado ninguna.<br>Dale a <b>+ Nueva aplicación</b> arriba.</div>`;
     return;
   }
-  lista.innerHTML = mias.map(a => {
+  let v = MIAS.slice();
+  if (MIA_ETAPA === 'trabajo') v = v.filter(meToca);
+  else if (MIA_ETAPA === 'por_traer') v = v.filter(a => etapa(a) === 'por_traer');
+  else if (MIA_ETAPA === 'vino') v = v.filter(a => etapa(a) === 'vino' || etapa(a) === 'vendida');
+  v.sort((x, y) => (meToca(y) - meToca(x)) || (diasPorTraer(y) - diasPorTraer(x)) || (new Date(y.created_at) - new Date(x.created_at)));
+  if (!v.length){
+    lista.innerHTML = `<div class="vacio">${MIA_ETAPA === 'trabajo' ? '✓ No te toca llamar a nadie hoy.' : 'Nada aquí.'}</div>`;
+    return;
+  }
+  lista.innerHTML = v.map(a => {
     const notas = (a.bitacora || []).filter(x => x.tipo !== 'etapa');
+    const ult = notas.slice(-2);
     return `
     <div class="fila" style="cursor:default">
       <div class="top">
         <div>
           <div class="nom">${esc(a.cliente_nombre)}${a.deal_number ? ` <span class="deal">#${esc(a.deal_number)}</span>` : ''}</div>
-          <div class="linea">${esc(tel(a.cliente_telefono))} · ${esc(cuandoRelativo(a.created_at))}</div>
+          <div class="linea"><a class="tel" href="tel:${esc(String(a.cliente_telefono || '').replace(/\D/g, ''))}">${esc(tel(a.cliente_telefono))}</a> · ${esc(cuandoRelativo(a.created_at))}</div>
         </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          ${etiquetaEtapa(a)}
           ${a.veredicto ? `<span class="badge b-${VER_COLOR[a.veredicto]}">${esc(et('veredicto', a.veredicto))}</span>`
                         : '<span class="badge b-gris">Todavía sin revisar</span>'}
-          ${a.estado !== 'nueva' ? `<span class="badge b-azul">${esc(et('estado', a.estado))}</span>` : ''}
         </div>
       </div>
-      ${notas.length ? `<div class="bit" style="margin-top:12px">
-        <h4>Lo que dijo Finance <span class="n">${notas.length}</span></h4>
-        ${notas.map(x => x.tipo === 'veredicto'
-          ? `<div class="bit-etapa">✓ <b>${esc(x.quien)}</b> ${esc(x.texto)} · ${esc(bitCuando(x.cuando))}</div>`
-          : `<div class="bit-item">
-               <div class="bit-ini">${esc(bitIniciales(x.quien))}</div>
-               <div class="bit-cuerpo">
-                 <div class="bit-meta"><b>${esc(x.quien)}</b> · ${esc(bitCuando(x.cuando))}</div>
-                 <div class="bit-texto">${esc(x.texto)}</div>
-               </div>
-             </div>`).join('')}
-      </div>` : `<div class="ultima" style="color:var(--gray-400)">Finance todavía no ha escrito nada aquí.</div>`}
-      <div class="acc" style="margin-top:12px">
+      ${siguientePaso(a)}
+      ${ult.length ? ult.map(x => `<div class="ultima"><b>${esc(x.quien)}:</b> ${esc(x.texto)}</div>`).join('')
+                   : `<div class="ultima" style="color:var(--gray-400)">Finance todavía no ha escrito nada aquí.</div>`}
+      ${botonesSeguimiento(a)}
+      <div class="acc" style="margin-top:10px">
         <a class="btn btn-ghost" style="text-decoration:none;display:inline-block" href="${esc(a.codigo || '')}" target="_blank">Ver la aplicación</a>
       </div>
     </div>`;
@@ -1391,6 +1815,7 @@ document.querySelectorAll('.chip[data-fi]').forEach(c => c.onclick = () => {
 });
 function limpiarFiltros(){
   VER = 'todas'; FILTRO = 'todas'; LOC = 'todas'; VEND = 'todos'; BUSCA = ''; SOLO_HOY = false;
+  ETAPA = 'todas'; RANGO = null; SEG = null;
   FICO = 'todas'; FICO_MIN = null; FICO_MAX = null;
   document.getElementById('buscar').value = '';
   document.getElementById('fico-min').value = '';
