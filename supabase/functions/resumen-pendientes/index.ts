@@ -61,20 +61,26 @@ function etapas() {
   })();
   return ETAPAS;
 }
-async function descartadoEnCRM(cid: string): Promise<string | null> {
+type Cierre = { motivo: string; tipo: "vendido" | "perdido"; at: string };
+async function descartadoEnCRM(cid: string): Promise<Cierre | null> {
   const j = await ghl(`https://services.leadconnectorhq.com/opportunities/search?location_id=${LOC}&contact_id=${cid}`, "2021-07-28");
   const e = await etapas();
   for (const o of j?.opportunities ?? []) {
     const st = e[o.pipelineStageId];
     const nombre = st ? st.etapa.replace(/^[\d.\s]+/, "").replace(/[^\p{L}\p{N}, ]/gu, "").trim() : "";
-    if (o.status === "won") return "vendido";
-    if (o.status === "lost") return `marcado perdido en el CRM${nombre ? " (etapa: " + nombre + ")" : ""}`;
-    if (st && (/sold deals/i.test(st.pipe) || CIERRE.test(st.etapa))) return nombre;
+    const at = o.lastStageChangeAt || o.lastStatusChangeAt || o.updatedAt || "";
+    const vendido = /vendido|sold/i.test(nombre) || (st && /sold deals/i.test(st.pipe));
+    const nom2 = st && /sold deals/i.test(st.pipe) ? `vendido (${st.pipe.replace(/[^\p{L}\p{N} ]/gu, "").trim()} · ${nombre})` : nombre;
+    if (o.status === "won") return { motivo: nom2 || "vendido", tipo: "vendido", at: o.lastStatusChangeAt || at };
+    if (o.status === "lost") return { motivo: st && CIERRE.test(st.etapa) ? nombre : `marcada perdida${nombre ? " (etapa: " + nombre + ")" : ""}`, tipo: "perdido", at: o.lastStatusChangeAt || at };
+    if (st && (vendido || CIERRE.test(st.etapa))) return { motivo: nom2, tipo: vendido ? "vendido" : "perdido", at };
   }
   return null;
 }
 
-async function ultimoContacto(contactId: string | null, tel: string): Promise<{ fecha: string; tipo: string; quien: string; fuera?: string } | null | undefined> {
+// Para las que chocan con el CRM: el último contacto, sin volver a mirar el cierre.
+async function ultimoContactoSinCierre(a: any) { const r = await ultimoContacto(a.crm_contact_id, a.telefono || "", true); return r; }
+async function ultimoContacto(contactId: string | null, tel: string, sinCierre = false): Promise<{ fecha: string; tipo: string; quien: string; fuera?: Cierre } | null | undefined> {
   if (!GHL || !LOC) return undefined;
   let cid = contactId;
   if (!cid && tel.length === 10) {
@@ -82,7 +88,7 @@ async function ultimoContacto(contactId: string | null, tel: string): Promise<{ 
     cid = j?.contact?.id ?? null;
   }
   if (!cid) return undefined;                       // no está en el CRM
-  const fuera = await descartadoEnCRM(cid);
+  const fuera = sinCierre ? null : await descartadoEnCRM(cid);
   if (fuera) return { fecha: "", tipo: "", quien: "", fuera };
   const conv = await ghl(`https://services.leadconnectorhq.com/conversations/search?locationId=${LOC}&contactId=${cid}`);
   let mejor: any = null;
@@ -206,8 +212,20 @@ Deno.serve(async (req) => {
       }));
     }
     // Los que el CRM ya descartó salen del reporte; se cuentan al final para que se sepa.
+    // Si el CRM la cerró ANTES de que Finance la aprobara, lo nuevo es la aprobación:
+    // se queda en el reporte con un aviso para que alguien la mueva en el CRM.
+    for (const a of filas) if (a.ult?.fuera && a.ult.fuera.at && Date.parse(a.ult.fuera.at) < Date.parse(a.veredicto_at)) {
+      a.choque = a.ult.fuera; a.ult = await ultimoContactoSinCierre(a);
+    }
     const descartados = filas.filter((a: any) => a.ult?.fuera);
     filas = filas.filter((a: any) => !a.ult?.fuera);
+    // Lo que el CRM cerró queda anotado en la aplicación (una sola vez), con motivo y fecha.
+    if (cuerpo.marcar !== false) for (const a of descartados) {
+      await fetch(`${SUPA}/rest/v1/rpc/ar_oa_marcar_cierre_crm`, {
+        method: "POST", headers: { ...H, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_id: a.id, p_tipo: a.ult.fuera.tipo, p_motivo: a.ult.fuera.motivo, p_at: a.ult.fuera.at || null }),
+      });
+    }
     // canal → vendedor → fichas
     const porCanal: Record<string, Record<string, any[]>> = {};
     for (const a of filas) {
@@ -234,6 +252,7 @@ Deno.serve(async (req) => {
           if (a.ult === undefined) ult = "❔ no está en el CRM, no se puede saber";
           else if (a.ult === null || a.ult.fecha < a.veredicto_at) ult = `⚠️ nadie lo ha contactado desde que se aprobó (${hace(a.veredicto_at)})`;
           else ult = `último contacto ${hace(a.ult.fecha)} · ${a.ult.tipo}${a.ult.quien ? " de " + a.ult.quien : ""}`;
+          if (a.choque) ult += `\n  └ 🚨 en el CRM está como «${a.choque.motivo}» desde el ${corta(diaNY(a.choque.at))}, pero Finance la aprobó después. Revisar y moverla en el CRM`;
           return `• **${nom}**${era} — ${que} el ${cuando(a.veredicto_at)}${a.vino ? " · vino, no compró" : ""}\n  └ ${ult}`;
         });
         bloques.push(`${men ?? `**${vend}**`} (${lista.length})\n${lineas.join("\n")}`);
@@ -248,7 +267,8 @@ Deno.serve(async (req) => {
       if (await publicar(canal, msg)) enviados.push(canal);
     }
     return json({ ok: true, pendientes: filas.length, mensajes: enviados.length, vista: VISTA,
-                  descartados: descartados.map((a: any) => `${a.cliente_nombre} (${a.vendedor_nombre}): ${a.ult.fuera}`) });
+                  descartados: descartados.map((a: any) => `${a.cliente_nombre} (${a.vendedor_nombre}): ${a.ult.fuera.motivo} · ${a.ult.fuera.tipo} · movida ${a.ult.fuera.at ? corta(diaNY(a.ult.fuera.at)) : "?"}`),
+                  choques: filas.filter((a: any) => a.choque).map((a: any) => `${a.cliente_nombre}: ${a.choque.motivo} desde ${corta(diaNY(a.choque.at))}, aprobada ${corta(diaNY(a.veredicto_at))}`) });
   } catch (e) {
     return json({ ok: false, error: String(e) }, 500);
   }
