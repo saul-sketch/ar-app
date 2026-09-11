@@ -67,7 +67,7 @@ async function ultimoContacto(contactId: string | null, tel: string): Promise<{ 
   }
   if (!mejor) return null;
   const u = await usuarios();
-  return { fecha: mejor.dateAdded, tipo: /CALL/.test(mejor.messageType) ? "📞" : "💬", quien: u[mejor.userId] || "" };
+  return { fecha: mejor.dateAdded, tipo: /CALL/.test(mejor.messageType) ? "📞 llamada" : "💬 mensaje", quien: u[mejor.userId] || "" };
 }
 
 // Los mismos canales que usa discord-estado para el aviso de aprobada.
@@ -86,6 +86,22 @@ const sinTildes = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLo
 const hoyNY = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
 const diaNY = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/New_York" });
 const corta = (ymd: string) => { const p = ymd.split("-"); return `${+p[2]}/${+p[1]}`; };
+// "hace 40 min", "hace 6 h", "hace 3 días": se entiende sin mirar el calendario.
+const hace = (iso: string) => {
+  const m = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 6e4));
+  if (m < 60) return `hace ${m} min`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `hace ${h} h`;
+  const d = Math.round(h / 24);
+  return d === 1 ? "hace 1 día" : `hace ${d} días`;
+};
+// "mié 10/9 2:15pm", en hora de Orlando.
+const cuando = (iso: string) => {
+  const t = new Date(iso);
+  const dia = t.toLocaleDateString("es-US", { timeZone: "America/New_York", weekday: "short" }).replace(".", "");
+  const hora = t.toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" }).replace(" ", "").toLowerCase();
+  return `${dia} ${corta(diaNY(iso))} ${hora}`;
+};
 const dias = (iso: string) => Math.max(0, Math.round((Date.parse(hoyNY()) - Date.parse(diaNY(iso))) / 864e5));
 
 // Mención por nombre y apellido; con solo el nombre de pila se podría mencionar al equivocado.
@@ -159,7 +175,7 @@ Deno.serve(async (req) => {
       ((porCanal[canal] ??= {})[vend] ??= []).push(a);
     }
 
-    const titulo = `**📋 Pendientes por vender — ${h < 13 ? "11am" : "4pm"} · ${corta(hoyNY())}**\nAprobadas y con posibilidad que todavía no han comprado. 📞/💬 = último contacto real (llamada o mensaje) y quién lo hizo.`;
+    const titulo = `**📋 Pendientes por vender — ${h < 13 ? "11am" : "4pm"} · ${corta(hoyNY())}**\nAprobadas y con posibilidad que todavía no han comprado. El último contacto es la última llamada o mensaje que le hizo alguien del equipo (no cuentan los automáticos).`;
     const enviados: string[] = [];
     for (const [canal, porVend] of Object.entries(porCanal)) {
       const bloques: string[] = [];
@@ -167,15 +183,14 @@ Deno.serve(async (req) => {
         const lista = porVend[vend].sort((x, y) => Date.parse(x.veredicto_at) - Date.parse(y.veredicto_at));
         const men = vend === SIN_NADIE ? `**${SIN_NADIE}** — el vendedor ya no está, hay que pasarlos a alguien` : await mencionDe(vend);
         const lineas = lista.map((a) => {
-          const d = dias(a.veredicto_at);
           const que = a.veredicto === "aprobado" ? "✅ Aprobada" : "🟡 Posible";
           const nom = String(a.cliente_nombre || "").replace(/[\d()+-]{7,}/g, "").replace(/\s+/g, " ").trim();   // hay quien mete el teléfono en el nombre
-          let ult = "";
-          if (a.ult === undefined) ult = " · no está en el CRM";
-          else if (a.ult === null || a.ult.fecha < a.veredicto_at) ult = " · ⚠️ nadie lo contacta desde la aprobación";
-          else ult = ` · ${a.ult.tipo} ${corta(diaNY(a.ult.fecha))}${a.ult.quien ? " " + a.ult.quien : ""}`;
           const era = vend === SIN_NADIE ? ` (era de ${String(a.vendedor_nombre).split(" ")[0]})` : "";
-          return `• ${nom}${era} — ${que} ${corta(diaNY(a.veredicto_at))} (${d === 0 ? "hoy" : d === 1 ? "1 día" : d + " días"})${a.vino ? " · vino, no compró" : ""}${ult}`;
+          let ult: string;
+          if (a.ult === undefined) ult = "❔ no está en el CRM, no se puede saber";
+          else if (a.ult === null || a.ult.fecha < a.veredicto_at) ult = `⚠️ nadie lo ha contactado desde que se aprobó (${hace(a.veredicto_at)})`;
+          else ult = `último contacto ${hace(a.ult.fecha)} · ${a.ult.tipo}${a.ult.quien ? " de " + a.ult.quien : ""}`;
+          return `• **${nom}**${era} — ${que} el ${cuando(a.veredicto_at)}${a.vino ? " · vino, no compró" : ""}\n  └ ${ult}`;
         });
         bloques.push(`${men ?? `**${vend}**`} (${lista.length})\n${lineas.join("\n")}`);
       }
