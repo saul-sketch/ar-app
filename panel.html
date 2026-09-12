@@ -77,6 +77,15 @@
   .seg-in:focus{border-color:var(--primary);}
   .seg-otro{display:flex;gap:6px;margin-top:8px;}
   .seg-otro .seg-in{flex:1;}
+  .react{margin-top:12px;padding:12px;border:1.5px solid #bfdbfe;background:#eff6ff;border-radius:12px;}
+  .react .seg-chips button.on{border-color:var(--primary);background:var(--primary);color:#fff;}
+  .react-g{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+  @media(max-width:480px){.react-g{grid-template-columns:1fr 1fr;}}
+  .react-g label{font-size:11px;font-weight:700;color:var(--gray-500);display:block;margin-bottom:3px;}
+  .react textarea.seg-in{min-height:84px;resize:vertical;}
+  .react-ok{margin-top:10px;width:100%;min-height:44px;border:0;border-radius:10px;background:var(--primary);color:#fff;
+       font-weight:700;font-size:14px;font-family:inherit;cursor:pointer;}
+  .react-ok:disabled{opacity:.5;}
 
   .kpi-clic{text-align:left;cursor:pointer;border:1.5px solid transparent;font-family:inherit;position:relative;transition:border-color .15s;}
   .kpi-clic:hover{border-color:var(--gray-300);}
@@ -475,6 +484,7 @@ function ocupado(){
   const f = document.activeElement;
   if (f && (f.tagName === 'TEXTAREA' || (f.tagName === 'INPUT' && f.id !== 'buscar'))) return true;
   if ([...document.querySelectorAll('.menu')].some(m => m.dataset.abierto === '1')) return true;
+  if (REACT) return true;          // llenando una reactivación: no se le redibuja encima
   return false;
 }
 
@@ -687,7 +697,8 @@ function vieneHoy(a){
   const hoy = new Date(); const f = String(a.visita_fecha).slice(0,10);
   return f === hoy.toLocaleDateString('en-CA') && a.estado !== 'cerrada';
 }
-function horasEsperando(a){ return (Date.now() - new Date(a.created_at)) / 36e5; }
+// Si la reactivaron, la espera cuenta desde que volvió a la fila, no desde que entró.
+function horasEsperando(a){ return (Date.now() - new Date(a.reactivada_at || a.created_at)) / 36e5; }
 
 let FICO = 'todas', FICO_MIN = null, FICO_MAX = null;
 // El puntaje que manda para filtrar: el más alto entre signer y co-signer.
@@ -1278,6 +1289,62 @@ async function mandarSeguimiento(id, accion, fecha, nota){
   avisito(dicho);
   repintarDonde();
 }
+/* Reactivar: cambió algo (una modificación, subieron los ingresos, notas nuevas) y la
+   aplicación vuelve a la fila de Finance. La puede reactivar el vendedor dueño o un
+   manager. El veredicto de antes no se borra: queda escrito en la bitácora. */
+let REACT = null, REACT_MOTIVO = null;
+const MOTIVOS_REACT = [['modificacion', 'Es una modificación'], ['ingresos', 'Cambiaron los ingresos'], ['notas', 'Hay información nueva'], ['otro', 'Otro']];
+function botonReactivar(a){
+  if (!a.veredicto) return '';
+  return `<button class="btn btn-ghost" onclick="event.stopPropagation();abrirReactivar('${a.id}')">🔄 Reactivar</button>`;
+}
+function abrirReactivar(id){ REACT = REACT === id ? null : id; REACT_MOTIVO = null; repintarDonde(); }
+function reactivarHTML(a){
+  if (REACT !== a.id) return '';
+  const n = v => v === null || v === undefined ? '' : Math.round(Number(v));
+  return `
+    <div class="react" onclick="event.stopPropagation()">
+      <div class="seg-t">🔄 Reactivar para que Finance la revise otra vez</div>
+      <div class="seg-sub">¿Por qué?</div>
+      <div class="seg-chips">${MOTIVOS_REACT.map(([k, t]) =>
+        `<button class="${REACT_MOTIVO === k ? 'on' : ''}" onclick="REACT_MOTIVO='${k}';this.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===this))">${t}</button>`).join('')}</div>
+      <div class="seg-sub">¿Qué cambió? <span>(obligatorio — Finance lo lee primero)</span></div>
+      <input class="seg-in" id="re-det-${a.id}" maxlength="500" placeholder="Ej. ahora gana $4,200 al mes, trae 2 talones nuevos">
+      <div class="seg-sub">Números <span>(cambia solo lo que cambió)</span></div>
+      <div class="react-g">
+        <div><label>Pago mensual</label><input class="seg-in" id="re-men-${a.id}" inputmode="numeric" value="${n(a.pago_mensual)}"></div>
+        <div><label>Down hoy</label><input class="seg-in" id="re-dh-${a.id}" inputmode="numeric" value="${n(a.down_hoy)}"></div>
+        <div><label>Down máximo</label><input class="seg-in" id="re-dm-${a.id}" inputmode="numeric" value="${n(a.down_max)}"></div>
+      </div>
+      <div class="seg-sub">Notas para Finance</div>
+      <textarea class="seg-in" id="re-not-${a.id}">${esc(a.notas || '')}</textarea>
+      <button class="react-ok" onclick="mandarReactivar('${a.id}', this)">Mandar a Finance otra vez</button>
+      <div style="font-size:12px;color:var(--gray-500);margin-top:6px">Vuelve a "Sin revisar". Lo que decía antes (${esc(et('veredicto', a.veredicto))}) queda guardado.</div>
+    </div>`;
+}
+async function mandarReactivar(id, btn){
+  const v = k => { const e = document.getElementById(k + id); return e ? e.value.trim() : ''; };
+  const num2 = k => { const d = v(k).replace(/[^\d]/g, ''); return d ? Number(d) : null; };
+  if (!REACT_MOTIVO){ avisito('Elige por qué la reactivas', true); return; }
+  if (v('re-det-').length < 5){ avisito('Escribe qué cambió', true); document.getElementById('re-det-' + id).focus(); return; }
+  btn.disabled = true; btn.textContent = 'Enviando…';
+  let r = null;
+  try{
+    r = await rpc('ar_oa_reactivar', { p_codigo: CODIGO || null, p_email: YO_EMAIL || ((typeof CRM !== 'undefined' && CRM && CRM.email) || null),
+      p_id: id, p_motivo: REACT_MOTIVO, p_detalle: v('re-det-'),
+      p_pago_mensual: num2('re-men-'), p_down_hoy: num2('re-dh-'), p_down_max: num2('re-dm-'), p_notas: v('re-not-') });
+  }catch(e){}
+  if (!Array.isArray(r) || !r[0]){ btn.disabled = false; btn.textContent = 'Mandar a Finance otra vez'; avisito('No se pudo reactivar. Intenta otra vez.', true); return; }
+  const fila2 = r[0];
+  [TODAS, MIAS].forEach(arr => { const i = arr.findIndex(x => x.id === id); if (i >= 0) arr[i] = fila2; });
+  // Aviso a Finance en su canal. No se espera: la aplicación ya quedó en la fila.
+  fetch(SUPA_URL + '/functions/v1/enviar-copia', { method: 'POST', headers: SUPA_H,
+    body: JSON.stringify({ codigo: fila2.codigo, reactivada: true }) }).catch(() => {});
+  REACT = null; REACT_MOTIVO = null;
+  avisito('Listo: volvió a la fila de Finance');
+  repintarDonde();
+}
+
 // Aviso chiquito abajo, que se va solo. Sin alert() del navegador.
 function avisito(t, mal){
   let e = document.getElementById('avisito');
@@ -1368,6 +1435,7 @@ function fila(a){
             return `<span class="badge b-${c}" title="lleva esperando">⏱ ${t}</span>`; })() : ''}
         ${a.veredicto ? `<span class="badge b-${VER_COLOR[a.veredicto]}" title="${esc((a.veredicto_por||'') + (a.veredicto_at ? ' · ' + cuandoRelativo(a.veredicto_at) : ''))}">${esc(et('veredicto', a.veredicto))}</span>`
                       : '<span class="badge b-gris">Sin revisar</span>'}
+        ${!a.veredicto && a.reactivada_at ? `<span class="badge b-azul" title="${esc((a.bitacora||[]).filter(x=>x.tipo==='reactivada').slice(-1).map(x=>x.texto)[0]||'')}">🔄 Reactivada</span>` : ''}
         ${a.urgencia ? `<span class="badge b-${urg}">${esc(et('urgencia', a.urgencia))}</span>` : ''}
         ${(a.bitacora || []).filter(x=>(x.tipo!=='etapa'&&x.tipo!=='veredicto')).length ? `<span class="badge b-gris" title="notas de Finance">✎ ${(a.bitacora || []).filter(x=>(x.tipo!=='etapa'&&x.tipo!=='veredicto')).length}</span>` : ''}
         ${a.copia_estado && a.copia_estado !== 'enviada' ? `<span class="badge b-ambar" title="${esc(COPIA_MAL[a.copia_estado] || a.copia_estado)}">✉ no le llegó</span>` : ''}
@@ -1449,10 +1517,12 @@ function fila(a){
         <a class="btn btn-ghost" style="text-decoration:none;display:inline-block" href="tel:${esc(String(a.cliente_telefono).replace(/\D/g,''))}">Llamar</a>
         ${a.crm_contact_id ? `<a class="btn btn-ghost" style="text-decoration:none;display:inline-block" target="_blank" href="https://app.smartwavedigital.io/v2/location/ez4QcQYqIRKvgT8fIQ22/contacts/detail/${esc(a.crm_contact_id)}">Ver en el CRM</a>` : ''}
         <button class="btn btn-ghost" onclick="copiar('${a.codigo || a.id}', this)">Copiar link</button>
+        ${botonReactivar(a)}
         <a class="btn btn-ghost" style="text-decoration:none;display:inline-block" href="${a.codigo ? a.codigo : 'a.html?id=' + a.id}" target="_blank">Abrir link</a>
         ${String(QUIEN).toLowerCase() === 'saul'
           ? `<button class="btn btn-ghost" style="color:var(--red);margin-left:auto" onclick="borrar('${a.id}')">Borrar</button>` : ''}
       </div>
+      ${reactivarHTML(a)}
     </div>
   </div>`;
 }
@@ -1632,7 +1702,9 @@ function pintarMias(){
       ${botonesSeguimiento(a)}
       <div class="acc" style="margin-top:10px">
         <a class="btn btn-ghost" style="text-decoration:none;display:inline-block" href="${esc(a.codigo || '')}" target="_blank">Ver la aplicación</a>
+        ${botonReactivar(a)}
       </div>
+      ${reactivarHTML(a)}
     </div>`;
   }).join('');
 }

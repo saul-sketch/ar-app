@@ -206,7 +206,7 @@ async function anotar(id: string, estado: string, detalle = "") {
 /** Avisar al canal de Discord. Se manda de una vez al someter: es lo unico que hace
  *  que alguien se entere sin tener que abrir el panel. Nunca frena nada — si no hay
  *  canal configurado o falla, la aplicacion ya quedo guardada igual. */
-async function aDiscord(a: Record<string, any>, link: string) {
+async function aDiscord(a: Record<string, any>, link: string, reactivada = false) {
   if (!DISCORD) return;
   const urg = et("urgencia", a.urgencia);
   const corre = a.urgencia === "hoy" || a.urgencia === "2-3dias";
@@ -221,6 +221,9 @@ async function aDiscord(a: Record<string, any>, link: string) {
   if (a.visita_fecha) campos.push({ name: "Viene al dealer", value: `${a.visita_fecha}${a.visita_hora ? " · " + a.visita_hora : ""}`, inline: true });
   if (a.deal_number) campos.push({ name: "Deal #", value: String(a.deal_number), inline: true });
   if (a.notas) campos.push({ name: "Lo que dijo el cliente", value: String(a.notas).slice(0, 900), inline: false });
+  // Reactivada: arriba de todo, qué cambió, por qué y cómo estaba antes.
+  const re = reactivada ? [...(a.bitacora ?? [])].reverse().find((x: any) => x?.tipo === "reactivada") : null;
+  if (re) campos.unshift({ name: `🔄 Reactivada por ${re.quien}`, value: String(re.texto).replace(/^🔄 La reactivó para revisión otra vez — /, "").slice(0, 1000), inline: false });
 
   // ?wait=true hace que Discord devuelva el mensaje que acaba de crear. Se guarda su id
   // para poder EDITAR este mismo mensaje cuando Finance ponga el veredicto, en vez de
@@ -229,12 +232,13 @@ async function aDiscord(a: Record<string, any>, link: string) {
     const r = await fetch(DISCORD + "?wait=true", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        content: corre ? "**Compra ya** — conviene mirarla pronto" : "",
+        content: reactivada ? "🔄 **Reactivada** — vuelve a la fila para revisar otra vez"
+               : corre ? "**Compra ya** — conviene mirarla pronto" : "",
         embeds: [{
           title: `${a.cliente_nombre}${a.deal_number ? " · #" + a.deal_number : ""}`,
           url: link,
           description: `${fono(a.cliente_telefono)}\nEnviada ${fechaHora(a.created_at)}`,
-          color: corre ? 0xef4444 : 0x1a1a2e,
+          color: reactivada ? 0x3b82f6 : corre ? 0xef4444 : 0x1a1a2e,
           fields: campos,
           footer: { text: "Aplicación online · Auto Republic" },
         }],
@@ -255,7 +259,7 @@ async function aDiscord(a: Record<string, any>, link: string) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   try {
-    const { codigo } = await req.json();
+    const { codigo, reactivada } = await req.json();
     if (!codigo) return json({ ok: false, motivo: "sin_codigo" }, 400);
     if (!GHL_TOKEN || !GHL_LOC) return json({ ok: false, motivo: "sin_llave" });
 
@@ -263,6 +267,16 @@ Deno.serve(async (req) => {
       { headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` } });
     const [a] = await r.json();
     if (!a) return json({ ok: false, motivo: "no_existe" }, 404);
+
+    // Reactivada: solo el aviso nuevo a Finance (tarjeta nueva; las ediciones siguientes
+    // van a esa). Sin correo. Solo si de verdad se acaba de reactivar, para que nadie
+    // pueda llenar el canal llamando esto a mano.
+    if (reactivada) {
+      if (!a.reactivada_at || Date.now() - Date.parse(a.reactivada_at) > 5 * 60e3 || a.veredicto)
+        return json({ ok: false, motivo: "no_reactivada" }, 400);
+      await aDiscord(a, SITIO.replace(/\/?$/, "/") + a.codigo, true);
+      return json({ ok: true });
+    }
 
     const contactId = await contactoDelVendedor(a.vendedor_email, a.vendedor_nombre);
     if (!contactId) { await anotar(a.id, "sin_contacto"); return json({ ok: false, motivo: "sin_contacto" }, 502); }
