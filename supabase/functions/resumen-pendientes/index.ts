@@ -224,8 +224,11 @@ Deno.serve(async (req) => {
     // con ellas y solo tapan las que sí. El historial sigue en el panel.
     const limpiadas = await limpiarTarjetasCerradas();
     if (cuerpo.solo_limpiar === true) return json({ ok: true, limpiadas });
+    // El CRM se revisa CADA hora (si movieron al cliente a "compró en otro lugar",
+    // vendido, no interesado…, la aplicación se cierra sola y su tarjeta se borra).
+    // El resumen a los vendedores sale solo a las 11 y a las 4.
     const h = Number(new Date().toLocaleString("en-US", { timeZone: "America/New_York", hour: "2-digit", hour12: false }));
-    if (cuerpo.forzar !== true && !HORAS.includes(h)) return json({ ok: true, motivo: "fuera_de_hora", hora: h, limpiadas });
+    const esHora = cuerpo.forzar === true || HORAS.includes(h);
     // Prueba: todo va a un solo canal en vez de a los de los equipos.
     const soloCanal = typeof cuerpo.canal === "string" ? cuerpo.canal : "";
     VISTA = cuerpo.vista === true ? [] : null;
@@ -235,7 +238,7 @@ Deno.serve(async (req) => {
     });
     let filas = await r.json();
     if (!Array.isArray(filas)) return json({ ok: false, motivo: "no_se_pudo_leer", detalle: filas }, 500);
-    if (!filas.length) return json({ ok: true, enviados: 0 });
+    if (!filas.length) return json({ ok: true, enviados: 0, limpiadas });
 
     // Último contacto de cada cliente, de 5 en 5 para no ahogar al CRM.
     for (let i = 0; i < filas.length; i += 5) {
@@ -257,6 +260,10 @@ Deno.serve(async (req) => {
         method: "POST", headers: { ...H, "Content-Type": "application/json" },
         body: JSON.stringify({ p_id: a.id, p_tipo: a.ult.fuera.tipo, p_motivo: a.ult.fuera.motivo, p_at: a.ult.fuera.at || null }),
       });
+    }
+    if (!esHora) {
+      const limpiadas2 = descartados.length ? await limpiarTarjetasCerradas() : 0;
+      return json({ ok: true, motivo: "fuera_de_hora", hora: h, cerradas_por_crm: descartados.length, limpiadas: limpiadas + limpiadas2 });
     }
     // canal → vendedor → fichas
     const porCanal: Record<string, Record<string, any[]>> = {};
