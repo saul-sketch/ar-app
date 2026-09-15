@@ -259,6 +259,7 @@
   .vbtn.on.verde{background:var(--green);border-color:var(--green);color:#fff;}
   .vbtn.on.ambar{background:var(--yellow);border-color:var(--yellow);color:#fff;}
   .vbtn.on.rojo{background:var(--red);border-color:var(--red);color:#fff;}
+  .vbtn.on.azul{background:var(--blue);border-color:var(--blue);color:#fff;}
   .fila .deal{font-size:12px;font-weight:700;color:var(--blue);background:#dbeafe;border-radius:6px;padding:2px 7px;margin-left:6px;vertical-align:middle;}
   .dealbox{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--gray-200);flex-wrap:wrap;}
   .dealbox .k{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--gray-500);}
@@ -364,6 +365,7 @@
             <button class="chip" data-v="aprobado">Aprobadas</button>
             <button class="chip" data-v="posible">Con posibilidad</button>
             <button class="chip" data-v="negado">Negadas</button>
+            <button class="chip" data-v="incompleto">Incompletas</button>
           </div>
         </div>
         <div class="frow">
@@ -407,7 +409,7 @@ let TODAS = [], FILTRO = 'todas', VER = 'todas', LOC = 'todas', VEND = 'todos', 
 /* Si la copia al vendedor no salió, tiene que verse aquí. Un correo que falla no
    puede quedarse solo en la pantalla del vendedor, que quizá ni lo leyó. */
 /* Verde/ámbar/rojo: el veredicto es lo primero que hay que poder leer de un vistazo. */
-const VER_COLOR = { aprobado:'verde', posible:'ambar', negado:'rojo', historico:'gris' };
+const VER_COLOR = { aprobado:'verde', posible:'ambar', negado:'rojo', incompleto:'azul', historico:'gris' };
 const COPIA_MAL = {
   dado_de_baja: 'ese correo pidió no recibir mensajes de AR — que use otro',
   correo_rechazado: 'el correo fue rechazado',
@@ -733,7 +735,7 @@ function visibles(){
     if (RANGO && !enRango(a[RANGO.campo], RANGO.a, RANGO.b)) return false;
     // Veredicto y etapa son ejes distintos: se cruzan, no se pisan.
     if (VER === 'sinrevisar' && a.veredicto) return false;
-    if (['aprobado','posible','negado'].includes(VER) && a.veredicto !== VER) return false;
+    if (['aprobado','posible','negado','incompleto'].includes(VER) && a.veredicto !== VER) return false;
     if (SOLO_HOY && !vieneHoy(a)) return false;
     if (FILTRO === 'hoy' && !(a.urgencia === 'hoy' || a.urgencia === '2-3dias')) return false;
     if (['trabajando','esperando','cerrada'].includes(FILTRO) && a.estado !== FILTRO) return false;
@@ -1034,6 +1036,7 @@ const ETAPAS = {
   vino:        { t: 'Vinieron, no compraron', c: 'azul', dueno: 'el closer' },
   vendida:     { t: 'Compraron',        c: 'verde', dueno: '' },
   negada:      { t: 'Negadas',          c: 'gris',  dueno: '' },
+  incompleta:  { t: 'Incompletas',      c: 'azul',  dueno: 'el vendedor' },
   perdida:     { t: 'Perdidas',         c: 'gris',  dueno: '' },
   historico:   { t: 'Históricas',       c: 'gris',  dueno: '' },
 };
@@ -1050,6 +1053,7 @@ function etapa(a){
   if (a.perdida_at) return 'perdida';
   if (a.veredicto === 'historico') return 'historico';
   if (a.veredicto === 'negado') return 'negada';
+  if (a.veredicto === 'incompleto') return 'incompleta';
   if (a.veredicto === 'aprobado' || a.veredicto === 'posible')
     return (d.vino_fecha || d.mismo_dia || d.antes) ? 'vino' : 'por_traer';
   return 'sin_revisar';
@@ -1079,6 +1083,7 @@ function diasPorTraer(a){
 // ¿Te toca hoy? Por traer y: el próximo contacto es hoy o ya pasó — o nunca se le
 // ha dado seguimiento. Una aprobada que nadie ha llamado es la peor de todas.
 function meToca(a){
+  if (etapa(a) === 'incompleta') return true;   // le falta algo a él: le toca ya
   if (etapa(a) !== 'por_traer') return false;
   if (a.proximo_contacto) return a.proximo_contacto <= hoyFL();
   // "Hablé con él — sin fecha": no vuelve a tocar hasta 3 días después.
@@ -1124,6 +1129,7 @@ function embudoHTML(base){
       <button class="lnk ${ETAPA === 'hoy_toca' ? 'on' : ''}" onclick="irA({etapa:'hoy_toca'})">📞 Toca llamar hoy <b>${toca}</b></button>
       <button class="lnk ${ETAPA === 'vendida' ? 'on' : ''}" onclick="irA({etapa:'vendida'})">Ya compraron <b>${c.vendida}</b></button>
       <button class="lnk ${ETAPA === 'perdida' ? 'on' : ''}" onclick="irA({etapa:'perdida'})">Perdidas <b>${c.perdida}</b></button>
+      <button class="lnk ${ETAPA === 'incompleta' ? 'on' : ''}" onclick="irA({etapa:'incompleta'})">📝 Incompletas <b>${c.incompleta}</b></button>
       <button class="lnk ${ETAPA === 'negada' ? 'on' : ''}" onclick="irA({etapa:'negada'})">Negadas <b>${c.negada}</b></button>
     </div>`;
 }
@@ -1175,7 +1181,7 @@ function etiquetaFiltroEtapa(){
     partes.push(v ? v.vendedor_nombre : VEND);
   }
   if (VER === 'sinrevisar') partes.push('sin revisar');
-  else if (['aprobado','posible','negado'].includes(VER)) partes.push({ aprobado: 'aprobadas', posible: 'con posibilidad', negado: 'negadas' }[VER]);
+  else if (['aprobado','posible','negado','incompleto'].includes(VER)) partes.push({ aprobado: 'aprobadas', posible: 'con posibilidad', negado: 'negadas', incompleto: 'incompletas' }[VER]);
   if (ETAPA === 'hoy_toca') partes.push('me tocan hoy');
   else if (ETAPA !== 'todas') partes.push((LISTAS[ETAPA] || ETAPAS[ETAPA] || { t: ETAPA }).t.toLowerCase());
   if (RANGO) partes.push(RANGO.etq);
@@ -1190,6 +1196,7 @@ function etiquetaEtapa(a){
     ? `<span class="badge b-azul" title="apareció en el reporte diario después de revisada">Vino ${fCorta(d.vino_fecha)}${d.vino_closer ? ' · ' + esc(String(d.vino_closer).split(' ')[0]) : ''} · no compró</span>`
     : `<span class="badge b-azul" title="la visita es del mismo día de la revisión o de antes">Ya estaba en el dealer ${fCorta(d.mismo_dia || d.antes)} · no compró</span>`;
   if (e === 'perdida') return `<span class="badge b-gris">✕ Perdida</span>`;
+  if (e === 'incompleta') return `<span class="badge b-azul" title="Finance necesita algo más del vendedor">📝 Incompleta · le falta al vendedor</span>`;
   if (e === 'por_traer'){
     const n = diasPorTraer(a);
     const c = n >= 4 ? 'rojo' : n >= 2 ? 'ambar' : 'gris';
@@ -1476,7 +1483,7 @@ function fila(a){
       ${bitacora(a)}
       <div class="verbox">
         <span class="k">Veredicto</span>
-        ${['aprobado','posible','negado'].map(v =>
+        ${['aprobado','posible','negado','incompleto'].map(v =>
           `<button class="vbtn ${a.veredicto===v?'on '+VER_COLOR[v]:''}" onclick="veredicto('${a.id}','${a.veredicto===v?'':v}')">${esc(et('veredicto', v))}</button>`).join('')}
         ${a.veredicto_por ? `<span class="quien">revisada por <b>${esc(a.veredicto_por)}</b> · ${esc(cuandoRelativo(a.veredicto_at))}</span>` : ''}
       </div>
@@ -1663,6 +1670,7 @@ function pintarMias(){
     <div class="embudo">
       ${btn('trabajo', toca, 'Te tocan hoy', toca ? 'var(--red)' : 'var(--green)')}
       ${btn('por_traer', c('por_traer'), 'Aprobadas y posibles sin venir', c('por_traer') ? 'var(--yellow)' : null)}
+      ${btn('incompleta', c('incompleta'), 'Incompletas — te falta algo', c('incompleta') ? 'var(--blue)' : null)}
       ${btn('vino', c('vino'), 'Vinieron, no compraron', 'var(--blue)')}
       ${btn('todas', MIAS.length, 'Todas mis apps', null)}
     </div>`;
@@ -1674,6 +1682,7 @@ function pintarMias(){
   let v = MIAS.slice();
   if (MIA_ETAPA === 'trabajo') v = v.filter(meToca);
   else if (MIA_ETAPA === 'por_traer') v = v.filter(a => etapa(a) === 'por_traer');
+  else if (MIA_ETAPA === 'incompleta') v = v.filter(a => etapa(a) === 'incompleta');
   else if (MIA_ETAPA === 'vino') v = v.filter(a => etapa(a) === 'vino');
   v.sort((x, y) => (meToca(y) - meToca(x)) || (diasPorTraer(y) - diasPorTraer(x)) || (new Date(y.created_at) - new Date(x.created_at)));
   if (!v.length){

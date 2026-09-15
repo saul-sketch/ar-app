@@ -98,6 +98,17 @@ async function aCanal(canalId: string, cuerpo: unknown): Promise<string | null> 
     return m?.id ? String(m.id) : null;
   } catch { return null; }
 }
+// Borra un mensaje del canal. Se usa para volver a publicar la tarjeta del vendedor
+// cuando hay noticia nueva: editar no suena, publicar de nuevo sí — y así en el canal
+// queda UNA sola tarjeta por aplicación, con todas las notas, en vez de una por nota.
+async function borrarDeCanal(canalId: string, msgId: string): Promise<void> {
+  if (!BOT || !canalId || !msgId) return;
+  try {
+    await fetch(`https://discord.com/api/v10/channels/${canalId}/messages/${msgId}`, {
+      method: "DELETE", headers: { Authorization: `Bot ${BOT}` },
+    });
+  } catch { /* si no se pudo borrar, queda una vieja; no es grave */ }
+}
 // Edita un mensaje ya publicado. false = ya no existe (lo borraron del canal).
 async function editarEnCanal(canalId: string, msgId: string, cuerpo: unknown): Promise<boolean> {
   if (!BOT || !canalId || !msgId) return false;
@@ -124,6 +135,7 @@ const VER = {
   aprobado:  { txt: "APROBADA",        color: 0x16a34a, emoji: "✅" },
   posible:   { txt: "CON POSIBILIDAD", color: 0xf59e0b, emoji: "🟡" },
   negado:    { txt: "NEGADA",          color: 0xef4444, emoji: "❌" },
+  incompleto:{ txt: "INCOMPLETA",      color: 0x3b82f6, emoji: "📝" },
   historico: { txt: "Historial",       color: 0x6b7280, emoji: "📁" },
 } as Record<string, { txt: string; color: number; emoji: string }>;
 
@@ -252,45 +264,61 @@ Deno.serve(async (req) => {
         }),
       }).catch(() => {});
     }
-    /* El mensaje del vendedor. Sale cuando hay veredicto y desde ahí queda VIVO: si
-       Finance escribe la nota DESPUÉS de marcar el veredicto —que es lo normal, primero
-       se decide y después se explica— este mensaje se actualiza y muestra la nota
-       buena. Antes quedaba congelado con la nota vieja y el vendedor salía a trabajar
-       con información equivocada.
-       Editar no vuelve a sonar: ya se le avisó una vez; esto corrige lo que ve cuando
-       entra a mirar. */
-    if (v && a.veredicto !== "historico") {
+    /* La tarjeta del vendedor. Sale cuando hay veredicto O cuando Finance le escribe
+       una nota (antes una nota sin veredicto no avisaba a nadie, y el vendedor se
+       enteraba tarde). Es UNA tarjeta por aplicación con TODAS las notas.
+       Regla del ruido: si hay noticia nueva (cambió el veredicto o hay una nota que no
+       se había avisado), la tarjeta vieja se borra y se publica otra vez —publicar es
+       lo que hace sonar el teléfono, editar no—. Si no hay noticia, solo se edita. */
+    const notasNuevas = notas.length > Number(a.discord_notas_aviso || 0);
+    const hayQueAvisar = esNoticia || notasNuevas;
+    if ((v && a.veredicto !== "historico") || notas.length) {
       const canal = await canalDelVendedor(a.vendedor_nombre, a.location);
       if (canal) {
-        const quéHacer = a.veredicto === "aprobado"
-          ? "Llama al cliente y tráelo."
-          : a.veredicto === "posible"
-            ? "Falta algo para cerrarla — mira la nota."
-            : "No pasó. Si consigues co-signer o más down, avísale a Finance.";
+        const quéHacer = !v
+          ? "Finance te dejó una nota — léela y responde lo que pida."
+          : a.veredicto === "aprobado"
+            ? "Llama al cliente y tráelo."
+            : a.veredicto === "posible"
+              ? "Falta algo para cerrarla — mira la nota."
+              : a.veredicto === "incompleto"
+                ? "Le falta información para poder revisarla — mira la nota, consigue lo que falta con el cliente y dale a 🔄 Reactivar en tu panel para que vuelva a Finance."
+                : "No pasó. Si consigues co-signer o más down, avísale a Finance.";
+        const titulo = v ? `${v.emoji} ${a.cliente_nombre} — ${v.txt}` : `✎ ${a.cliente_nombre} — nota de Finance`;
+        const emoji = v ? v.emoji : "✎";
         // La mención va en el TEXTO, no dentro del recuadro: Discord no avisa por las
         // menciones que están dentro de un embed.
         const mencion = await mencionDe(a.vendedor_nombre);
-        // Van las últimas notas, no solo una: cuando Finance escribe dos seguidas, la
-        // segunda suele ser la que dice qué hacer.
-        const notasTxt = notas.slice(-3).map((n: any) =>
-          `**${n.quien ?? "Finance"}:** ${String(n.texto ?? "").slice(0, 280)}`).join("\n");
+        // TODAS las notas en orden, cada una con quién y a qué hora. Un recuadro de
+        // Discord aguanta 1024 letras por campo: si se pasa, se parte en varios campos.
+        const cuando = (iso: unknown) => {
+          const t = Date.parse(String(iso || "")); if (!t) return "";
+          return " · " + new Date(t).toLocaleString("es-US", { timeZone: "America/New_York", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true }).replace(/\./g, "");
+        };
+        const lineas = notas.map((n: any, i: number) =>
+          `${i === notas.length - 1 && notasNuevas ? "🆕 " : ""}**${n.quien ?? "Finance"}**${cuando(n.cuando)}: ${String(n.texto ?? "").slice(0, 400)}`);
+        const fields: Array<Record<string, unknown>> = [];
+        let bloque = "";
+        for (const l of lineas) {
+          if ((bloque + "\n" + l).length > 1000 && bloque) { fields.push({ name: fields.length ? "…" : `Notas de Finance · ${notas.length}`, value: bloque, inline: false }); bloque = ""; }
+          bloque += (bloque ? "\n" : "") + l;
+        }
+        if (bloque) fields.push({ name: fields.length ? "…" : (notas.length > 1 ? `Notas de Finance · ${notas.length}` : "Nota de Finance"), value: bloque, inline: false });
         const cuerpo = {
-          content: mencion ? `${mencion} — ${v.emoji} **${a.cliente_nombre}**: ${v.txt}` : "",
+          content: mencion ? `${mencion} — ${emoji} **${a.cliente_nombre}**: ${v ? v.txt : "nota nueva de Finance"}` : "",
           allowed_mentions: { parse: ["users"] },
           embeds: [{
-            title: `${v.emoji} ${a.cliente_nombre} — ${v.txt}`,
+            title: titulo,
             url: `https://saul-sketch.github.io/ar-app/${a.codigo}`,
             description: `**${a.cliente_nombre}**\n${quéHacer}`,
-            color: v.color,
-            fields: notasTxt
-              ? [{ name: notas.length > 1 ? `Notas de Finance · ${notas.length}` : "Nota de Finance",
-                   value: notasTxt, inline: false }]
-              : [],
-            footer: { text: `Revisada por ${a.veredicto_por ?? quien}` },
+            color: v ? v.color : 0x6b7280,
+            fields,
+            footer: { text: v ? `Revisada por ${a.veredicto_por ?? quien}` : `Nota de ${ultima?.quien ?? quien}` },
           }],
         };
         let vid = a.discord_msg_vend || null;
-        if (vid && !(await editarEnCanal(canal, vid, cuerpo))) vid = null;   // lo borraron
+        if (vid && hayQueAvisar) { await borrarDeCanal(canal, vid); vid = null; }   // noticia: se vuelve a publicar
+        if (vid && !(await editarEnCanal(canal, vid, cuerpo))) vid = null;         // lo borraron
         if (!vid) {
           vid = await aCanal(canal, cuerpo);
           if (vid) {
@@ -300,6 +328,12 @@ Deno.serve(async (req) => {
             }).catch(() => {});
           }
         }
+        if (notasNuevas) {
+          await fetch(`${SUPA}/rest/v1/rpc/ar_oa_discord_notas`, {
+            method: "POST", headers: { ...H, "Content-Type": "application/json" },
+            body: JSON.stringify({ p_id: a.id, p_n: notas.length }),
+          }).catch(() => {});
+        }
       }
     }
     if (esNoticia) {
@@ -308,7 +342,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({ p_id: a.id, p_v: a.veredicto }),
       }).catch(() => {});
     }
-    return json({ ok: true, aviso: esNoticia ? "enviado" : "ya se habia avisado" });
+    return json({ ok: true, aviso: esNoticia ? "enviado" : (notasNuevas ? "nota avisada" : "ya se habia avisado") });
   } catch (e) {
     return json({ ok: false, motivo: String((e as Error)?.message || e) }, 500);
   }

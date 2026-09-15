@@ -56,7 +56,7 @@ const ETIQUETAS = {
   // 'historial' no es un veredicto que alguien haya puesto: marca las que vinieron del
   // formulario viejo del call center y nunca pasaron por Finance. Va aparte para que no
   // aparezcan como pendientes ni ensucien el % de aprobación.
-  veredicto: { aprobado: 'Aprobada', posible: 'Con posibilidad', negado: 'Negada', historico: 'Historial' }
+  veredicto: { aprobado: 'Aprobada', posible: 'Con posibilidad', negado: 'Negada', incompleto: 'Incompleta', historico: 'Historial' }
 };
 const et = (campo, v) => (ETIQUETAS[campo] && ETIQUETAS[campo][v]) || v || '';
 
