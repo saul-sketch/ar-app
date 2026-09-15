@@ -187,13 +187,45 @@ async function publicar(canal: string, content: string): Promise<boolean> {
   return r.ok;
 }
 
+async function limpiarTarjetasCerradas(): Promise<number> {
+  try {
+    const r = await fetch(`${SUPA}/rest/v1/rpc/ar_oa_tarjetas_cerradas`, {
+      method: "POST", headers: { ...H, "Content-Type": "application/json" }, body: "{}",
+    });
+    const filas = r.ok ? await r.json() : [];
+    if (!Array.isArray(filas)) return 0;
+    let n = 0;
+    for (const a of filas) {
+      const canal = CANAL_EQUIPO[a.equipo] || CANAL_TIENDA[String(a.location || "").toLowerCase().trim()];
+      if (canal && a.msg) {
+        const d = await fetch(`https://discord.com/api/v10/channels/${canal}/messages/${a.msg}`, {
+          method: "DELETE", headers: { Authorization: `Bot ${BOT}` },
+        }).catch(() => null);
+        // 404 = ya no estaba; también se da por limpia. Otro error (p. ej. 429) se reintenta la próxima hora.
+        if (d && !d.ok && d.status !== 404) continue;
+      }
+      await fetch(`${SUPA}/rest/v1/rpc/ar_oa_discord_vend`, {
+        method: "POST", headers: { ...H, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_id: a.id, p_msg: null }),
+      }).catch(() => {});
+      n++;
+    }
+    return n;
+  } catch { return 0; }
+}
+
 Deno.serve(async (req) => {
   try {
     if (!SUPA || !SERVICE || !BOT) return json({ ok: false, motivo: "sin_config" }, 500);
     let cuerpo: Record<string, unknown> = {};
     try { cuerpo = await req.json(); } catch { /* sin cuerpo */ }
+    // Cada hora (no solo a las 11 y a las 4): las tarjetas del vendedor cuyo cliente ya
+    // compró, se perdió o el CRM cerró, se borran del canal. Ya no hay nada que hacer
+    // con ellas y solo tapan las que sí. El historial sigue en el panel.
+    const limpiadas = await limpiarTarjetasCerradas();
+    if (cuerpo.solo_limpiar === true) return json({ ok: true, limpiadas });
     const h = Number(new Date().toLocaleString("en-US", { timeZone: "America/New_York", hour: "2-digit", hour12: false }));
-    if (cuerpo.forzar !== true && !HORAS.includes(h)) return json({ ok: true, motivo: "fuera_de_hora", hora: h });
+    if (cuerpo.forzar !== true && !HORAS.includes(h)) return json({ ok: true, motivo: "fuera_de_hora", hora: h, limpiadas });
     // Prueba: todo va a un solo canal en vez de a los de los equipos.
     const soloCanal = typeof cuerpo.canal === "string" ? cuerpo.canal : "";
     VISTA = cuerpo.vista === true ? [] : null;
