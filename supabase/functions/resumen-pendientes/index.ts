@@ -276,30 +276,47 @@ Deno.serve(async (req) => {
       ((porCanal[canal] ??= {})[vend] ??= []).push(a);
     }
 
-    const titulo = `**📋 Pendientes por vender — ${h < 13 ? "11am" : "4pm"} · ${corta(hoyNY())}**\nAprobadas y con posibilidad que todavía no han comprado. El último contacto es la última llamada o mensaje que le hizo alguien del equipo (no cuentan los automáticos).`;
+    /* Lectura de un vistazo: lo primero de cada línea es CUÁNTOS DÍAS lleva el cliente
+       sin que nadie lo toque, con su color. Por vendedor, el peor arriba; entre
+       vendedores, el que más tiene abandonados arriba. Sin explicaciones largas. */
+    const titulo = `**📋 Pendientes por vender — ${h < 13 ? "11am" : "4pm"} · ${corta(hoyNY())}**\n🔴 4+ días sin tocar · 🟠 2-3 · 🟢 al día · ⚠️ nunca desde que se aprobó`;
+    const diasDesde = (iso: string) => Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 864e5));
     const enviados: string[] = [];
     for (const [canal, porVend] of Object.entries(porCanal)) {
       const bloques: string[] = [];
-      for (const vend of Object.keys(porVend).sort((x, y) => (x === SIN_NADIE ? 1 : 0) - (y === SIN_NADIE ? 1 : 0) || x.localeCompare(y))) {
-        const lista = porVend[vend].sort((x, y) => Date.parse(x.veredicto_at) - Date.parse(y.veredicto_at));
-        const men = vend === SIN_NADIE ? `**${SIN_NADIE}** — el vendedor ya no está, hay que pasarlos a alguien` : await mencionDe(vend);
+      // Días sin tocar de cada aplicación: desde el último contacto real, o desde la
+      // aprobación si nadie lo ha llamado. Sin CRM no se sabe: va al final.
+      const sinTocar = (a: any): number | null => a.ult === undefined ? null
+        : (a.ult === null || a.ult.fecha < a.veredicto_at) ? diasDesde(a.veredicto_at) : diasDesde(a.ult.fecha);
+      const rojos = (l: any[]) => l.filter((a) => (sinTocar(a) ?? 0) >= 4).length;
+      const vends = Object.keys(porVend).sort((x, y) => (x === SIN_NADIE ? 1 : 0) - (y === SIN_NADIE ? 1 : 0)
+        || rojos(porVend[y]) - rojos(porVend[x]) || porVend[y].length - porVend[x].length || x.localeCompare(y));
+      for (const vend of vends) {
+        const lista = porVend[vend].sort((x, y) => (sinTocar(y) ?? -1) - (sinTocar(x) ?? -1));
+        const men = vend === SIN_NADIE ? `**${SIN_NADIE}** (el vendedor ya no está — repartir)` : await mencionDe(vend);
+        const nRojos = rojos(lista);
         const lineas = lista.map((a) => {
-          const que = a.veredicto === "aprobado" ? "✅ Aprobada" : "🟡 Posible";
+          const que = a.veredicto === "aprobado" ? "✅" : "🟡";
           const nom = String(a.cliente_nombre || "").replace(/[\d()+-]{7,}/g, "").replace(/\s+/g, " ").trim();   // hay quien mete el teléfono en el nombre
           const era = vend === SIN_NADIE ? ` (era de ${String(a.vendedor_nombre).split(" ")[0]})` : "";
-          let ult: string;
-          if (a.ult === undefined) ult = "❔ no está en el CRM, no se puede saber";
-          else if (a.ult === null || a.ult.fecha < a.veredicto_at) ult = `⚠️ nadie lo ha contactado desde que se aprobó (${hace(a.veredicto_at)})`;
-          else ult = `último contacto ${hace(a.ult.fecha)} · ${a.ult.tipo}${a.ult.quien ? " de " + a.ult.quien : ""}`;
-          if (a.choque) {
-            // Lo que el vendedor tiene que entender: el CRM dice que ya no va, pero Finance lo acaba de aprobar.
-            const q = /^marcada perdida/.test(a.choque.motivo) ? "como perdido"
-                    : a.choque.tipo === "vendido" ? "como que ya compró con nosotros" : `como «${a.choque.motivo}»`;
-            ult += `\n  └ 🚨 Ojo: en el CRM está cerrado ${q} desde el ${corta(diaNY(a.choque.at))}, pero Finance lo aprobó el ${corta(diaNY(a.veredicto_at))}. Si el cliente sigue interesado, reactívenlo en el CRM.`;
+          const d = sinTocar(a);
+          const nunca = a.ult === null || (a.ult && a.ult.fecha < a.veredicto_at);
+          let cabeza: string;
+          if (d === null) cabeza = "❔ sin CRM";
+          else {
+            const sem = d >= 4 ? "🔴" : d >= 2 ? "🟠" : "🟢";
+            const dias = d === 0 ? "hoy" : d === 1 ? "1 día" : `${d} días`;
+            cabeza = nunca ? (d === 0 ? "⚠️ aprobada hoy, nadie lo ha llamado" : `⚠️ ${dias} sin llamar desde la aprobación`)
+                           : (d === 0 ? "🟢 tocado hoy" : `${sem} ${dias} sin tocar`);
           }
-          return `• **${nom}**${era} — ${que} el ${cuando(a.veredicto_at)}${a.vino ? " · vino, no compró" : ""}\n  └ ${ult}`;
+          let linea = `${cabeza} · ${que} **${nom}**${era} · aprob. ${corta(diaNY(a.veredicto_at))}${a.vino ? " · vino, no compró" : ""}`;
+          if (a.choque) {
+            const q = /^marcada perdida/.test(a.choque.motivo) ? "perdido" : a.choque.tipo === "vendido" ? "vendido" : `«${a.choque.motivo}»`;
+            linea += `\n  └ 🚨 el CRM lo tiene ${q} desde ${corta(diaNY(a.choque.at))} — si sigue interesado, reactívalo en el CRM`;
+          }
+          return linea;
         });
-        bloques.push(`${men ?? `**${vend}**`} (${lista.length})\n${lineas.join("\n")}`);
+        bloques.push(`${men ?? `**${vend}**`} — ${lista.length}${nRojos ? ` · 🔴 ${nRojos} sin tocar 4+ días` : ""}\n${lineas.join("\n")}`);
       }
       // Discord corta a 2000 caracteres: se parte por vendedor, nunca a mitad de uno.
       const cc = (MANAGERS[canal] ?? []).map((id) => `<@${id}>`).join(" ");
