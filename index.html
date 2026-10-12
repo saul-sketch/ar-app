@@ -417,8 +417,8 @@ const RECUERDA = 'ar_oa_vendedor';
 const val = id => document.getElementById(id).value.trim();
 const num = id => { const d = val(id).replace(/[^\d]/g,''); return d ? Number(d) : null; };
 
-function limpiar(){
-  if (!confirm('¿Borrar todo lo escrito?')) return;
+async function limpiar(){
+  if (!await confirmar('¿Borrar todo lo escrito?', { si: 'Borrar', peligro: true })) return;
   document.querySelectorAll('.field-input').forEach(i => { if (i.id !== 'f_vend_nombre' && i.id !== 'f_vend_email') i.value=''; });
   ['trade_in','placa','urgencia','co_buyer'].forEach(k => delete sel[k]);
   tipos = [];
@@ -531,7 +531,7 @@ async function subirDocsForm(input){
   a.docs = a.docs || [];
   const aviso = document.getElementById('docs-aviso');
   const grandes = files.filter(f => f.size > MAX_DOC);
-  if (grandes.length) alert('Estos pesan más de 15 MB y no se pueden subir:\n' + grandes.map(f=>f.name).join('\n'));
+  if (grandes.length) avisar('Estos pesan más de 15 MB y no se pueden subir:\n' + grandes.map(f=>f.name).join('\n'));
   const buenos = files.filter(f => f.size <= MAX_DOC);
   let n = 0;
   for (const f of buenos){
@@ -555,7 +555,7 @@ async function subirDocsForm(input){
       pintarDocsForm();
     }catch(e){
       aviso.textContent = '';
-      alert('No se pudo subir "' + f.name + '". Revisa el internet e intenta otra vez.');
+      avisar('No se pudo subir "' + f.name + '". Revisa el internet e intenta otra vez.');
       return;
     }
   }

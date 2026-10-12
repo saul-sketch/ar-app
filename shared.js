@@ -106,3 +106,52 @@ function bitCuando(iso){
   if (d.toDateString() === ayer.toDateString()) return 'ayer ' + hora;
   return `${d.getDate()} ${MESES[d.getMonth()].slice(0,3)} · ${hora}`;
 }
+
+/* ── Avisos y confirmaciones propios ─────────────────────────────────────────
+   En vez de alert()/confirm() del navegador, que se ven distintos en cada teléfono
+   y no combinan con el resto. avisar(texto) muestra un aviso con "Entendido";
+   confirmar(texto, {si, peligro}) devuelve una promesa con true/false.
+   Se cierra con Escape, tocando afuera (= cancelar) o con los botones; Enter acepta (en lo que borra, el foco arranca en Cancelar).
+   El foco queda dentro mientras está abierto y vuelve a donde estaba al cerrar. */
+function dialogo(texto, o){
+  o = o || {};
+  return new Promise(resolver => {
+    const antes = document.activeElement;
+    const fondo = document.createElement('div');
+    fondo.className = 'dlg-fondo';
+    fondo.innerHTML = `<div class="dlg" role="${o.cancelar ? 'alertdialog' : 'dialog'}" aria-modal="true" aria-labelledby="dlg-t">
+        <div class="dlg-t" id="dlg-t"></div>
+        <div class="dlg-b">
+          ${o.cancelar ? `<button type="button" class="btn btn-ghost dlg-no"></button>` : ''}
+          <button type="button" class="btn btn-primary dlg-si ${o.peligro ? 'dlg-peligro' : ''}"></button>
+        </div></div>`;
+    fondo.querySelector('.dlg-t').textContent = texto;
+    fondo.querySelector('.dlg-si').textContent = o.si || 'Entendido';
+    if (o.cancelar) fondo.querySelector('.dlg-no').textContent = o.cancelar;
+    const botones = [...fondo.querySelectorAll('button')];
+    const cerrar = (v) => {
+      document.removeEventListener('keydown', teclas, true);
+      fondo.remove();
+      try { if (antes && antes.focus) antes.focus({ preventScroll: true }); } catch (e) {}
+      resolver(v);
+    };
+    const teclas = (e) => {
+      if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); cerrar(false); }
+      else if (e.key === 'Enter' && document.activeElement && !document.activeElement.classList.contains('dlg-no')){ e.preventDefault(); e.stopPropagation(); cerrar(true); }
+      else if (e.key === 'Tab'){
+        e.preventDefault();
+        const i = botones.indexOf(document.activeElement);
+        botones[(i + (e.shiftKey ? -1 : 1) + botones.length) % botones.length].focus();
+      }
+    };
+    fondo.addEventListener('click', e => { if (e.target === fondo) cerrar(false); });
+    fondo.querySelector('.dlg-si').onclick = (e) => { e.stopPropagation(); cerrar(true); };
+    if (o.cancelar) fondo.querySelector('.dlg-no').onclick = (e) => { e.stopPropagation(); cerrar(false); };
+    document.addEventListener('keydown', teclas, true);
+    document.body.appendChild(fondo);
+    // Si la acción borra algo, el foco arranca en Cancelar: un Enter distraído no borra.
+    fondo.querySelector(o.peligro && o.cancelar ? '.dlg-no' : '.dlg-si').focus({ preventScroll: true });
+  });
+}
+const avisar = (texto) => dialogo(texto);
+const confirmar = (texto, o) => dialogo(texto, Object.assign({ si: 'Sí', cancelar: 'Cancelar' }, o || {}));

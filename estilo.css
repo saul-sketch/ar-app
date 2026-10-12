@@ -135,13 +135,17 @@ textarea.field-input{min-height:88px;resize:vertical;line-height:1.5;}
 /* ── Teléfono ────────────────────────────────────────────────────────────────
    En el iPhone: campos a 16px (con menos, Safari hace zoom al tocarlos y la
    pantalla queda corrida), todo lo que se toca de al menos 40px de alto, y nada
-   de letra por debajo de 11px. Solo en pantallas táctiles o chicas: la
+   de letra por debajo de 12px. Solo en pantallas táctiles o chicas: la
    computadora se ve igual que antes. */
 @media (max-width:767px), (hover:none) and (pointer:coarse){
   .field-input,.field-select,textarea.field-input{font-size:16px;}
   #yoCampo{font-size:16px!important;}
   .header a{display:inline-flex;align-items:center;min-height:40px;}
-  .field-label,.sect h2,.docbox .k{font-size:11px;}
+  .field-label,.sect h2,.docbox .k{font-size:12px;}
+  /* La fecha sigue siendo la del teléfono (su calendario es el más cómodo), pero
+     con la misma cara que los demás campos: alineada a la izquierda y de la misma altura. */
+  input[type=date].field-input{-webkit-appearance:none;appearance:none;text-align:left;line-height:20px;}
+  input[type=date].field-input::-webkit-date-and-time-value{text-align:left;margin:0;}
   .qnum{font-size:12px;}
   .badge{font-size:12px;}
   label.btn{text-align:center;}
@@ -160,3 +164,16 @@ textarea.field-input{min-height:88px;resize:vertical;line-height:1.5;}
      ("Co-buyer / co-signer" quedaba una palabra por renglón). */
   .dato .k{min-width:40%;}
 }
+
+/* Avisos propios (en lugar de alert/confirm del navegador). */
+.dlg-fondo{position:fixed;inset:0;z-index:100;background:rgba(17,24,39,.45);display:flex;align-items:center;justify-content:center;
+           padding:16px;animation:fade .15s ease;}
+.dlg{background:var(--card);border-radius:16px;box-shadow:var(--shadow-lg);width:100%;max-width:400px;max-height:calc(100vh - 32px);
+     overflow-y:auto;padding:22px 20px 18px;}
+.dlg-t{font-size:15px;line-height:1.5;color:var(--gray-900);white-space:pre-line;word-break:break-word;}
+.dlg-b{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;flex-wrap:wrap;}
+.dlg-b .btn{min-height:44px;min-width:120px;flex:0 1 auto;}
+.dlg-b .btn-primary{flex:0 1 auto;}
+.dlg-peligro{background:var(--red);}
+.dlg-peligro:hover:not(:disabled){background:#b91c1c;}
+@media (max-width:767px){ .dlg-b .btn{flex:1 1 0;} }
