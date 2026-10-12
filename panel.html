@@ -283,6 +283,39 @@
   .bit-etapa b{color:var(--gray-700);}
   .bit-vacia{font-size:12.5px;color:var(--gray-400);padding:4px 0 2px;}
   .det .acc .btn{padding:9px 15px;font-size:12px;min-height:40px;}
+  /* ── Teléfono ──────────────────────────────────────────────────────────────
+     Mismo criterio que estilo.css: en pantallas táctiles o chicas, campos a 16px
+     (sin zoom de Safari), botones de 40px de alto y letra mínima legible. La
+     computadora queda igual. */
+  @media (max-width:767px), (hover:none) and (pointer:coarse){
+    .chip,.lnk,.filtro-etapa button,.celda{min-height:40px;}
+    .btn-fuera{display:inline-flex;align-items:center;min-height:40px;}
+    .rango{height:auto;}
+    .rango input{font-size:16px;height:40px;width:52px;}
+    .seg-chips button{min-height:40px;}
+    .buscador input,.seg-in,.bit-nueva textarea,.menu-buscar,.dealbox .field-input{font-size:16px;}
+    .menu-tit,.ftit,.seg-t,.bit h4,.bit h4 .n,.verbox .k,.dealbox .k,.ficolbl,.fila .cif .l,.tabla th,.emb-per .l{font-size:11px;}
+    .bit-meta,.verbox .quien,.kpi-sub,.kpi-ver,.menu-n,.react-g label,.bit-ini,.emb-per .flecha span{font-size:12px;}
+  }
+  @media (max-width:767px){
+    /* FICO: signer y co-signer lado a lado, Guardar debajo a todo el ancho. Antes
+       el co-signer caía solo en otro renglón, desalineado. */
+    .ficobox{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;align-items:end;}
+    .ficobox .k,.ficobox .btn,.ficobox .quien,.ficobox .fico-ok{grid-column:1/-1;}
+    .ficobox .fico-ok:empty{display:none;}
+    .ficobox .field-input{max-width:none;min-width:0;width:100%;}
+    /* Veredicto: los cuatro botones en dos columnas parejas. */
+    .verbox{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+    .verbox .k,.verbox .quien{grid-column:1/-1;}
+    /* Tablas de KPIs: el nombre se queda fijo a la izquierda al deslizar los
+       números, y puede partirse en dos renglones en vez de empujar todo afuera. */
+    .tabla th:first-child,.tabla td:first-child{position:sticky;left:0;z-index:1;background:#fff;white-space:normal;
+      min-width:118px;max-width:150px;box-shadow:1px 0 0 var(--gray-200);}
+    .tabla th:first-child{background:var(--gray-100);}
+    /* Vista del vendedor: sus botones en fila, igual que en la ficha del panel. */
+    #mia-lista .acc{display:flex;flex-wrap:wrap;gap:8px;}
+    #mia-lista .acc .btn{padding:9px 15px;font-size:13px;min-height:40px;}
+  }
 </style>
 </head>
 <body>
@@ -1487,7 +1520,7 @@ function fila(a){
           `<button class="vbtn ${a.veredicto===v?'on '+VER_COLOR[v]:''}" onclick="veredicto('${a.id}','${a.veredicto===v?'':v}')">${esc(et('veredicto', v))}</button>`).join('')}
         ${a.veredicto_por ? `<span class="quien">revisada por <b>${esc(a.veredicto_por)}</b> · ${esc(cuandoRelativo(a.veredicto_at))}</span>` : ''}
       </div>
-      <div class="dealbox">
+      <div class="dealbox ficobox">
         <span class="k">FICO</span>
         <label class="ficolbl">signer
           <input class="field-input" id="fico-${a.id}" value="${esc(ficoTxt(a.fico, a.fico_txt))}"

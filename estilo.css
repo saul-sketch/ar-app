@@ -131,3 +131,32 @@ textarea.field-input{min-height:88px;resize:vertical;line-height:1.5;}
    vieja está; la fecha sirve para hablar con el cliente o cruzar con el CRM. */
 .cuando{color:var(--gray-400);font-variant-numeric:tabular-nums}
 .cuando::before{content:'· '}
+
+/* ── Teléfono ────────────────────────────────────────────────────────────────
+   En el iPhone: campos a 16px (con menos, Safari hace zoom al tocarlos y la
+   pantalla queda corrida), todo lo que se toca de al menos 40px de alto, y nada
+   de letra por debajo de 11px. Solo en pantallas táctiles o chicas: la
+   computadora se ve igual que antes. */
+@media (max-width:767px), (hover:none) and (pointer:coarse){
+  .field-input,.field-select,textarea.field-input{font-size:16px;}
+  #yoCampo{font-size:16px!important;}
+  .header a{display:inline-flex;align-items:center;min-height:40px;}
+  .field-label,.sect h2,.docbox .k{font-size:11px;}
+  .qnum{font-size:12px;}
+  .badge{font-size:12px;}
+  label.btn{text-align:center;}
+  .doc{padding:0 4px 0 11px;max-width:100%;}
+  .doc-n{min-width:0;flex:0 1 auto;}
+  .doc-n,.doc-x{min-height:40px;}
+  .doc-x{min-width:32px;font-size:14px;}
+  .doc-p{font-size:12px;}
+  /* El teléfono es texto dentro de una línea: se agranda el área del toque sin
+     mover nada de lugar. */
+  .tel{position:relative;}
+  .tel::after{content:'';position:absolute;left:0;right:0;top:-13px;bottom:-13px;}
+}
+@media (max-width:767px){
+  /* La etiqueta de la izquierda no se deja aplastar por una respuesta larga
+     ("Co-buyer / co-signer" quedaba una palabra por renglón). */
+  .dato .k{min-width:40%;}
+}
