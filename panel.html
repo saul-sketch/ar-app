@@ -478,7 +478,7 @@ async function abrirFuera(btn){
   // por abrirse "sola" fuera del clic.
   const w = window.open('', '_blank');
   try{
-    const email  = (SESION && SESION.email)  || (CRM && CRM.email)  || '';
+    const email  = yoId();
     const nombre = (SESION && SESION.nombre) || (CRM && CRM.nombre) || QUIEN || '';
     const t = await rpc('ar_oa_pase_crear', { p_codigo: CODIGO.startsWith('crm:') ? '' : CODIGO, p_email: email, p_nombre: nombre });
     if (!t) throw new Error('sin pase');
@@ -502,7 +502,7 @@ async function cargar(){
   // cambia la etapa de cada ficha, y pintarlas sin él las dejaría mal ubicadas.
   const [filas] = await Promise.all([
     rpc('ar_oa_todas', { p_codigo: CODIGO }).catch(() => null),
-    cargarDesenlaces((typeof CRM !== 'undefined' && CRM && CRM.email) || null),
+    cargarDesenlaces(yoId() || null),
   ]);
   if (Array.isArray(filas)) { TODAS = filas; ULTIMA = Date.now(); pintar(); }
 }
@@ -556,7 +556,7 @@ async function refrescar(silencioso){
   const antes = huella(TODAS);
   const [filas] = await Promise.all([
     rpc('ar_oa_todas', { p_codigo: CODIGO }).catch(() => null),
-    cargarDesenlaces((CRM && CRM.email) || null),
+    cargarDesenlaces(yoId() || null),
   ]);
   if (!Array.isArray(filas)) return;
   ULTIMA = Date.now();
@@ -1317,7 +1317,7 @@ function seguir(id, accion){
 async function mandarSeguimiento(id, accion, fecha, nota){
   let r = null;
   try{
-    r = await rpc('ar_oa_seguir', { p_codigo: CODIGO || null, p_email: YO_EMAIL || ((typeof CRM !== 'undefined' && CRM && CRM.email) || null),
+    r = await rpc('ar_oa_seguir', { p_codigo: CODIGO || null, p_email: yoId() || null,
                                     p_id: id, p_accion: accion, p_fecha: fecha || null, p_nota: nota || null });
   }catch(e){}
   if (!Array.isArray(r) || !r[0]){ avisito('No se pudo anotar. Intenta otra vez.', true); return; }
@@ -1370,7 +1370,7 @@ async function mandarReactivar(id, btn){
   btn.disabled = true; btn.textContent = 'Enviando…';
   let r = null;
   try{
-    r = await rpc('ar_oa_reactivar', { p_codigo: CODIGO || null, p_email: YO_EMAIL || ((typeof CRM !== 'undefined' && CRM && CRM.email) || null),
+    r = await rpc('ar_oa_reactivar', { p_codigo: CODIGO || null, p_email: yoId() || null,
       p_id: id, p_motivo: REACT_MOTIVO, p_detalle: v('re-det-'),
       p_pago_mensual: num2('re-men-'), p_down_hoy: num2('re-dh-'), p_down_max: num2('re-dm-'), p_notas: v('re-not-') });
   }catch(e){}
@@ -1656,13 +1656,19 @@ async function veredicto(id, v){
    tenga que preguntarle al manager si ya salió la aprobación. */
 const SESION_KEY = 'ar_oa_sesion';
 let SESION = null;
+/* Quién soy para la base de datos. Con sesión firmada (entró por el menú del CRM o
+   con un pase) se manda el token, no el correo: el correo solo ya no abre nada. */
+function yoId(){
+  if (SESION && SESION.token) return 'ses:' + SESION.token;
+  return (CRM && CRM.email) || YO_EMAIL || '';
+}
 
 /* Arranca con lo que dice la sesión: manager al panel completo, vendedor a lo suyo. */
 async function arrancarSesion(s){
   SESION = s;
   if (s.nivel === 'manager'){
     QUIEN = s.nombre;
-    CODIGO = 'crm:' + (s.email || '') + '|' + (s.nombre || '');
+    CODIGO = 'crm:' + (s.token ? 'ses:' + s.token : (s.email || '')) + '|' + (s.nombre || '');
     CRM = { nombre: s.nombre, email: s.email };
     document.getElementById('yo').textContent = s.nombre;
     const cs = document.getElementById('chip-salir'); if (cs) cs.style.display = '';
@@ -1681,7 +1687,7 @@ async function verMias(nombre, email){
   const lista = document.getElementById('mia-lista');
   lista.innerHTML = '<div class="cargando">Cargando…</div>';
   try{
-    const [m] = await Promise.all([rpc('ar_oa_mias', { p_email: email }), cargarDesenlaces(email)]);
+    const [m] = await Promise.all([rpc('ar_oa_mias', { p_email: yoId() || email }), cargarDesenlaces(yoId() || email)]);
     MIAS = m || [];
   }catch(e){
     lista.innerHTML = '<div class="vacio">No se pudo conectar. Intenta otra vez.</div>'; return;
@@ -2034,7 +2040,25 @@ function limpiarFiltros(){
     return arrancarSesion(s);
   }
 
-  // 2) ¿Ya hay sesión guardada en este navegador?
+  // 2) ¿Viene del menú del CRM con su llave? Se cambia por una sesión firmada y la
+  //    llave sale de la dirección.
+  const llave = (q.get('k') || '').trim();
+  const emailCrm = (q.get('email') || '').trim().toLowerCase();
+  if (llave && emailCrm){
+    document.getElementById('puerta').style.display = 'none';
+    let s = null;
+    try{ s = (await rpc('ar_sesion_crm', { p_email: emailCrm, p_nombre: (q.get('name') || q.get('user') || '').trim(), p_k: llave }) || [])[0]; }catch(e){}
+    history.replaceState(null, '', location.pathname);
+    if (s && s.token){
+      try{ localStorage.setItem(SESION_KEY, JSON.stringify(s)); }catch(e){}
+      return arrancarSesion(s);
+    }
+    document.getElementById('puerta').style.display = '';
+    errorPuerta('No se pudo confirmar tu usuario del CRM. Vuelve a abrir desde el menú.');
+    return;
+  }
+
+  // 3) ¿Ya hay sesión guardada en este navegador?
   let g2 = null; try{ g2 = JSON.parse(localStorage.getItem(SESION_KEY) || 'null'); }catch(e){}
   if (g2 && g2.nombre){ document.getElementById('puerta').style.display = 'none'; return arrancarSesion(g2); }
 

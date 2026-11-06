@@ -24,9 +24,12 @@ const leerG = (k) => { try { return localStorage.getItem(k) || ''; } catch (e) {
 
   function quienSoy() {
     const porUrl = (q.get('email') || '').trim().toLowerCase();
-    if (porUrl) { try { localStorage.setItem(LLAVE_SESION, JSON.stringify({ email: porUrl })); } catch (e) {} }
     let ses = null; try { ses = JSON.parse(leerG(LLAVE_SESION) || 'null'); } catch (e) {}
-    return { codigo: leerG(LLAVE_CODIGO), email: porUrl || ((ses && ses.email) || '') };
+    // No pisar una sesión firmada con un correo que venga en el link.
+    if (porUrl && !(ses && ses.token)) { try { localStorage.setItem(LLAVE_SESION, JSON.stringify({ email: porUrl })); } catch (e) {} ses = { email: porUrl }; }
+    // Con sesión firmada se manda el token; el correo solo deja de abrir fichas.
+    const firmado = ses && ses.token ? 'ses:' + ses.token : '';
+    return { codigo: leerG(LLAVE_CODIGO), email: firmado || porUrl || ((ses && ses.email) || '') };
   }
 
   async function traer() {
