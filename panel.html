@@ -2060,7 +2060,10 @@ function limpiarFiltros(){
 
   // 3) ¿Ya hay sesión guardada en este navegador?
   let g2 = null; try{ g2 = JSON.parse(localStorage.getItem(SESION_KEY) || 'null'); }catch(e){}
-  if (g2 && g2.nombre){ document.getElementById('puerta').style.display = 'none'; return arrancarSesion(g2); }
+  // Solo sirve una sesión firmada; las viejas (solo correo) se descartan y la persona
+  // vuelve a entrar por el menú del CRM una vez.
+  if (g2 && g2.nombre && g2.token){ document.getElementById('puerta').style.display = 'none'; return arrancarSesion(g2); }
+  if (g2 && !g2.token){ try{ localStorage.removeItem(SESION_KEY); }catch(e){} }
 
   const nombre = (q.get('name') || q.get('user') || '').trim();
   const email  = (q.get('email') || '').trim().toLowerCase();
